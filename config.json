@@ -1,0 +1,5 @@
+{
+	"ws_url": "ws://127.0.0.1:8765/ws",
+	"camera_index": 0,
+	"update_interval_ms": 200
+}

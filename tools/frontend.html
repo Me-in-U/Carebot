@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ko">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Carebot Test Frontend</title>
+		<style>
+			body {
+				font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+				margin: 20px;
+			}
+			h1 {
+				font-size: 20px;
+			}
+			.row {
+				margin: 10px 0;
+			}
+			button {
+				margin-right: 8px;
+				padding: 8px 12px;
+			}
+			#status {
+				display: inline-block;
+				padding: 4px 8px;
+				border-radius: 6px;
+				background: #eee;
+			}
+			#log {
+				width: 100%;
+				height: 320px;
+				border: 1px solid #ccc;
+				padding: 8px;
+				overflow: auto;
+				white-space: pre-wrap;
+				background: #fafafa;
+			}
+			.pill {
+				display: inline-block;
+				padding: 2px 8px;
+				border-radius: 999px;
+				font-size: 12px;
+				margin-left: 6px;
+			}
+			.ok {
+				background: #e6ffed;
+				color: #096d1c;
+				border: 1px solid #b7eb8f;
+			}
+			.err {
+				background: #fff2f0;
+				color: #a8071a;
+				border: 1px solid #ffa39e;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Carebot Test Frontend <span id="status">disconnected</span></h1>
+		<div class="row">
+			<button id="btnConnect">Connect</button>
+			<button id="btnDisconnect">Disconnect</button>
+			<span class="pill" id="role">frontend</span>
+		</div>
+		<div class="row">
+			<button id="btnStartTrack">Start Tracking</button>
+			<button id="btnStopTrack">Stop Tracking</button>
+			<button id="btnInit">Init Pose</button>
+			<button id="btnHeart">Make Heart</button>
+			<button id="btnHug">Hug</button>
+		</div>
+		<div class="row">
+			<div id="log"></div>
+		</div>
+
+		<h3>Live Joint Angles</h3>
+		<div class="row" id="anglesRow">
+			<span>S1: <strong id="a1">-</strong></span>
+			<span style="margin-left: 10px">S2: <strong id="a2">-</strong></span>
+			<span style="margin-left: 10px">S3: <strong id="a3">-</strong></span>
+			<span style="margin-left: 10px">S4: <strong id="a4">-</strong></span>
+			<span style="margin-left: 10px">S5: <strong id="a5">-</strong></span>
+			<span style="margin-left: 10px">S6: <strong id="a6">-</strong></span>
+		</div>
+
+		<h3>Manual Control</h3>
+		<div class="row" id="manualRow">
+			<div>
+				<input type="number" id="i1" min="0" max="180" value="90" />
+				<button onclick="nudge(1,-5)">S1 -5</button>
+				<button onclick="nudge(1,5)">S1 +5</button>
+			</div>
+			<div>
+				<input type="number" id="i2" min="0" max="180" value="150" />
+				<button onclick="nudge(2,-5)">S2 -5</button>
+				<button onclick="nudge(2,5)">S2 +5</button>
+			</div>
+			<div>
+				<input type="number" id="i3" min="0" max="180" value="20" />
+				<button onclick="nudge(3,-5)">S3 -5</button>
+				<button onclick="nudge(3,5)">S3 +5</button>
+			</div>
+			<div>
+				<input type="number" id="i4" min="0" max="180" value="20" />
+				<button onclick="nudge(4,-5)">S4 -5</button>
+				<button onclick="nudge(4,5)">S4 +5</button>
+			</div>
+			<div>
+				<input type="number" id="i5" min="0" max="180" value="90" />
+				<button onclick="nudge(5,-5)">S5 -5</button>
+				<button onclick="nudge(5,5)">S5 +5</button>
+			</div>
+			<div>
+				<input type="number" id="i6" min="0" max="180" value="30" />
+				<button onclick="nudge(6,-5)">S6 -5</button>
+				<button onclick="nudge(6,5)">S6 +5</button>
+			</div>
+			<div style="margin-top: 8px">
+				<button onclick="applyAngles()">Apply All</button>
+			</div>
+		</div>
+
+		<script>
+			const WS_URL = "ws://127.0.0.1:8765/ws";
+			let ws = null;
+
+			const $ = (id) => document.getElementById(id);
+			const statusEl = $("status");
+			const logEl = $("log");
+
+			function log(msg, ok = true) {
+				const t = new Date().toISOString();
+				const line = `[${t}] ${msg}`;
+				const span = document.createElement("div");
+				span.textContent = line;
+				span.className = ok ? "ok" : "err";
+				logEl.appendChild(span);
+				logEl.scrollTop = logEl.scrollHeight;
+			}
+
+			function setStatus(text) {
+				statusEl.textContent = text;
+			}
+
+			function connect() {
+				if (ws && ws.readyState === WebSocket.OPEN) return;
+				ws = new WebSocket(WS_URL);
+				ws.onopen = () => {
+					setStatus("connected");
+					log("connected to " + WS_URL);
+					ws.send(JSON.stringify({ type: "hello", agent: "frontend" }));
+				};
+				ws.onmessage = (ev) => {
+					try {
+						const data = JSON.parse(ev.data);
+						log("recv: " + JSON.stringify(data));
+						if (data.type === "joint_state" && Array.isArray(data.angles)) {
+							const a = data.angles;
+							for (let i = 1; i <= 6; i++) {
+								const val = a[i - 1];
+								const el = document.getElementById("a" + i);
+								if (el) el.textContent = val === null || val === undefined ? "-" : String(val);
+							}
+						}
+					} catch (e) {
+						console.error(e);
+						log("recv non-json: " + ev.data, false);
+					}
+				};
+				ws.onerror = (ev) => {
+					log("error: " + ev.message, false);
+				};
+				ws.onclose = () => {
+					setStatus("disconnected");
+					log("disconnected");
+				};
+			}
+
+			function disconnect() {
+				if (ws) ws.close();
+			}
+
+			function sendCommand(command) {
+				if (!ws || ws.readyState !== WebSocket.OPEN) {
+					log("ws not connected", false);
+					return;
+				}
+				ws.send(JSON.stringify({ type: "command", command, who: "frontend" }));
+				log("send command: " + command);
+			}
+
+			$("btnConnect").onclick = connect;
+			$("btnDisconnect").onclick = disconnect;
+			$("btnStartTrack").onclick = () => sendCommand("face_tracking");
+			$("btnStopTrack").onclick = () => sendCommand("stop_face_tracking");
+			$("btnInit").onclick = () => sendCommand("init_pose");
+			$("btnHeart").onclick = () => sendCommand("make_heart");
+			$("btnHug").onclick = () => sendCommand("hug");
+
+			globalThis.nudge = function (id, delta) {
+				if (!ws || ws.readyState !== WebSocket.OPEN) return;
+				ws.send(JSON.stringify({ type: "command", command: "nudge_joint", id, delta, who: "frontend" }));
+			};
+
+			globalThis.applyAngles = function () {
+				if (!ws || ws.readyState !== WebSocket.OPEN) return;
+				const vals = [];
+				for (let i = 1; i <= 6; i++) {
+					const v = Number.parseInt(document.getElementById("i" + i).value, 10);
+					vals.push(Number.isNaN(v) ? 0 : Math.max(0, Math.min(180, v)));
+				}
+				ws.send(JSON.stringify({ type: "command", command: "set_joints", angles: vals, time_ms: 600, who: "frontend" }));
+			};
+		</script>
+	</body>
+</html>
