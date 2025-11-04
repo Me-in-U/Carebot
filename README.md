@@ -20,7 +20,8 @@ DOFBOT 로봇팔을 MQTT로 제어하는 애플리케이션입니다. `app_mqtt.
 - `mqtt_base`: 기본 토픽 베이스(기본 `carebot`)
 - `mqtt_qos`: QoS 레벨(0|1|2)
 - `robot_id`: 이 인스턴스의 로봇 식별자(`robot_left` 또는 `robot_right` 등)
-- `camera_index`: OpenCV 카메라 인덱스(기본 0)
+- `camera_index`: 기본(OpenCV 카메라 인덱스, 폴백)
+- `camera_index_left`, `camera_index_right`: 좌/우 로봇 전용 카메라 인덱스(각 인스턴스에서 자동 선택)
 - `update_interval_ms`: 얼굴/조인트 업데이트 주기(ms)
 - `heart_move_ms`, `heart_hold_between_s`, `heart_hold_final_s`, `heart_hold_neutral_s`: 제스처 타이밍 조정
 - `arm_port`: 단일 포트 지정 시 사용(Windows 예: `COM3`)

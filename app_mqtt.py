@@ -69,7 +69,13 @@ class CarebotAppMQTT:
             f"{self.mqtt_base}/carebot/tx"  # 백엔드로 이벤트/결과 전송
         )
 
-        camera_index = int(cfg.get("camera_index", 0))
+        # 카메라 인덱스: 로봇 좌/우에 따라 분기, 없으면 공통 camera_index 폴백
+        if self.robot_id == "robot_left":
+            camera_index = int(cfg.get("camera_index_left", cfg.get("camera_index", 0)))
+        else:
+            camera_index = int(
+                cfg.get("camera_index_right", cfg.get("camera_index", 0))
+            )
         update_interval_ms = int(cfg.get("update_interval_ms", 200))
 
         # 로봇팔 및 컨트롤러 초기화
