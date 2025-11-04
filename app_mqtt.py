@@ -28,7 +28,7 @@ def now_iso() -> str:
 
 
 class CarebotAppMQTT:
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str, robot_id_override: Optional[str] = None):
         # 로깅 설정
         if not logging.getLogger().handlers:
             logging.basicConfig(
@@ -48,16 +48,15 @@ class CarebotAppMQTT:
         self.mqtt_base = cfg.get("mqtt_base", "carebot")
         self.mqtt_qos = int(cfg.get("mqtt_qos", 0))
 
-        # 다중 로봇 구분용 ID (config)
-        self.robot_id = cfg.get("robot_id", "robot_left")
+        # 다중 로봇 구분용 ID: CLI 인자 우선, 미제공 시 기본값 'robot_left'
+        self.robot_id = robot_id_override or "robot_left"
 
-        # Arm 시리얼 포트(by-path 권장): 단일 키 > 좌/우 전용 키 순으로 매핑
+        # Arm 시리얼 포트(by-path 권장): which_arm/robot_id에 맞춰 좌/우 우선, 없으면 공통 포트 사용
         # 예: /dev/serial/by-path/pci-0000:03:00.0-usb-0:1.2:1.0-port0
-        self.arm_port = cfg.get("arm_port") or (
-            cfg.get("arm_port_left")
-            if self.robot_id == "robot_left"
-            else cfg.get("arm_port_right")
-        )
+        if self.robot_id == "robot_left":
+            self.arm_port = cfg.get("arm_port_left") or cfg.get("arm_port")
+        else:
+            self.arm_port = cfg.get("arm_port_right") or cfg.get("arm_port")
         if isinstance(self.arm_port, str):
             self.arm_port = self.arm_port.strip() or None
 
@@ -739,5 +738,26 @@ class CarebotAppMQTT:
 
 if __name__ == "__main__":
     base = os.path.dirname(os.path.abspath(__file__))
-    app = CarebotAppMQTT(config_path=os.path.join(base, "config.json"))
+    # Minimal CLI: allow only robot_id override for convenience
+    rid_override: Optional[str] = None
+    for arg in sys.argv[1:]:
+        if "=" not in arg:
+            continue
+        k, v = arg.split("=", 1)
+        k = (k or "").strip().lower()
+        v = (v or "").strip()
+        if not k:
+            continue
+        if k == "robot_id":
+            rid_override = v
+        elif k in {"which_arm", "arm"}:
+            vv = v.lower()
+            if vv in {"left", "robot_left"}:
+                rid_override = "robot_left"
+            elif vv in {"right", "robot_right"}:
+                rid_override = "robot_right"
+
+    app = CarebotAppMQTT(
+        config_path=os.path.join(base, "config.json"), robot_id_override=rid_override
+    )
     app.run()

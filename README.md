@@ -53,7 +53,8 @@ cd Carebot
 python app_mqtt.py
 ```
 
-모든 값은 `config.json`으로만 제어합니다(환경변수/CLI 오버라이드 사용하지 않음).
+기본값은 왼쪽 팔(`robot_left`)이며, 편의를 위해 실행 시 `robot_id`만 인자로 오버라이드할 수 있습니다.
+예) `python app_mqtt.py`(왼쪽 기본), `python app_mqtt.py robot_id=robot_right`, 또는 `python app_mqtt.py which_arm=left`.
 
 ## 메시지 형식
 
@@ -224,10 +225,11 @@ Windows(cmd) 예시:
 
 ```cmd
 cd Carebot
-python app_mqtt.py
+python app_mqtt.py              # 기본: 왼팔(robot_left), arm_port_left 사용
+python app_mqtt.py which_arm=right  # 오른팔(robot_right), arm_port_right 사용
 ```
 
-두 대를 동시에 실행하려면 각 인스턴스의 `config.json`에서 `robot_id`와 시리얼 포트(`arm_port` 또는 좌/우 포트)를 다르게 설정하세요.
+두 대를 동시에 실행하려면 서로 다른 터미널에서 각각 실행하면서 `robot_id`를 다르게 넘기거나, 각 인스턴스의 `config.json`에서 `robot_id`와 시리얼 포트(`arm_port` 또는 좌/우 포트`)를 다르게 설정하세요.
 
 ### Spring Boot 연동 예시
 
