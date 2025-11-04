@@ -118,6 +118,57 @@
 			</div>
 		</div>
 
+		<h3>Sliders (live)</h3>
+		<style>
+			/* local-only styles for sliders */
+			input[type="range"] {
+				width: 100%;
+			}
+			.slider-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+				gap: 8px 16px;
+			}
+			.slider {
+				display: grid;
+				grid-template-columns: 36px 1fr 48px;
+				align-items: center;
+				gap: 8px;
+			}
+		</style>
+		<div class="slider-grid">
+			<div class="slider">
+				<div>S1</div>
+				<input type="range" id="s1" min="0" max="180" step="1" />
+				<div><span id="sv1">-</span>°</div>
+			</div>
+			<div class="slider">
+				<div>S2</div>
+				<input type="range" id="s2" min="0" max="180" step="1" />
+				<div><span id="sv2">-</span>°</div>
+			</div>
+			<div class="slider">
+				<div>S3</div>
+				<input type="range" id="s3" min="0" max="180" step="1" />
+				<div><span id="sv3">-</span>°</div>
+			</div>
+			<div class="slider">
+				<div>S4</div>
+				<input type="range" id="s4" min="0" max="180" step="1" />
+				<div><span id="sv4">-</span>°</div>
+			</div>
+			<div class="slider">
+				<div>S5</div>
+				<input type="range" id="s5" min="0" max="180" step="1" />
+				<div><span id="sv5">-</span>°</div>
+			</div>
+			<div class="slider">
+				<div>S6</div>
+				<input type="range" id="s6" min="0" max="180" step="1" />
+				<div><span id="sv6">-</span>°</div>
+			</div>
+		</div>
+
 		<script>
 			const WS_URL = "ws://127.0.0.1:8765/ws";
 			let ws = null;
@@ -158,6 +209,15 @@
 								const val = a[i - 1];
 								const el = document.getElementById("a" + i);
 								if (el) el.textContent = val === null || val === undefined ? "-" : String(val);
+								// 슬라이더 실시간 반영 (드래그 중이면 스킵)
+								const sEl = document.getElementById("s" + i);
+								const svEl = document.getElementById("sv" + i);
+								if (sEl && svEl && !dragging.has(i)) {
+									if (val !== null && val !== undefined) {
+										sEl.value = String(val);
+										svEl.textContent = String(val);
+									}
+								}
 							}
 						}
 					} catch (e) {
@@ -209,6 +269,34 @@
 				}
 				ws.send(JSON.stringify({ type: "command", command: "set_joints", angles: vals, time_ms: 600, who: "frontend" }));
 			};
+
+			// 슬라이더 바인딩 (WS)
+			const dragging = new Set();
+			const timers = new Map();
+			function bindSliders() {
+				for (let i = 1; i <= 6; i++) {
+					const sEl = document.getElementById("s" + i);
+					const svEl = document.getElementById("sv" + i);
+					if (!sEl || !svEl) continue;
+					sEl.addEventListener("pointerdown", () => dragging.add(i));
+					sEl.addEventListener("pointerup", () => dragging.delete(i));
+					sEl.addEventListener("pointercancel", () => dragging.delete(i));
+					sEl.addEventListener("mouseleave", () => dragging.delete(i));
+					sEl.addEventListener("input", () => {
+						const angle = Math.max(0, Math.min(180, Number.parseInt(sEl.value, 10) || 0));
+						svEl.textContent = String(angle);
+						const key = i;
+						if (timers.has(key)) clearTimeout(timers.get(key));
+						const h = setTimeout(() => {
+							if (!ws || ws.readyState !== WebSocket.OPEN) return;
+							ws.send(JSON.stringify({ type: "command", command: "set_joint", id: i, angle, time_ms: 160, who: "frontend" }));
+							timers.delete(key);
+						}, 80);
+						timers.set(key, h);
+					});
+				}
+			}
+			bindSliders();
 		</script>
 	</body>
 </html>
