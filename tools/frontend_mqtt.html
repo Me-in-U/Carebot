@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ko">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Carebot MQTT Frontend</title>
+		<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+		<style>
+			body {
+				font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+				margin: 20px;
+			}
+			h1 {
+				font-size: 20px;
+			}
+			.row {
+				margin: 10px 0;
+			}
+			button {
+				margin-right: 8px;
+				padding: 8px 12px;
+			}
+			input[type="text"],
+			input[type="number"] {
+				padding: 6px;
+			}
+			#status {
+				display: inline-block;
+				padding: 4px 8px;
+				border-radius: 6px;
+				background: #eee;
+			}
+			#log {
+				width: 100%;
+				height: 320px;
+				border: 1px solid #ccc;
+				padding: 8px;
+				overflow: auto;
+				white-space: pre-wrap;
+				background: #fafafa;
+			}
+			.pill {
+				display: inline-block;
+				padding: 2px 8px;
+				border-radius: 999px;
+				font-size: 12px;
+				margin-left: 6px;
+			}
+			.ok {
+				background: #e6ffed;
+				color: #096d1c;
+				border: 1px solid #b7eb8f;
+			}
+			.err {
+				background: #fff2f0;
+				color: #a8071a;
+				border: 1px solid #ffa39e;
+			}
+			.config {
+				display: grid;
+				grid-template-columns: 140px 1fr;
+				gap: 8px;
+				align-items: center;
+				max-width: 720px;
+			}
+			.label {
+				color: #555;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Carebot MQTT Frontend <span id="status">disconnected</span></h1>
+
+		<div class="row config">
+			<div class="label">Broker WS URL</div>
+			<input type="text" id="brokerUrl" value="ws://127.0.0.1:9001" />
+			<div class="label">Base Topic</div>
+			<input type="text" id="baseTopic" value="carebot" />
+			<div class="label">Client ID</div>
+			<input type="text" id="clientId" value="frontend-web" />
+		</div>
+
+		<div class="row">
+			<button id="btnConnect">Connect</button>
+			<button id="btnDisconnect">Disconnect</button>
+			<span class="pill" id="role">frontend</span>
+		</div>
+
+		<div class="row">
+			<button id="btnStartTrack">Start Tracking</button>
+			<button id="btnStopTrack">Stop Tracking</button>
+			<button id="btnInit">Init Pose</button>
+			<button id="btnHeart">Make Heart</button>
+			<button id="btnHug">Hug</button>
+		</div>
+
+		<div class="row">
+			<div id="log"></div>
+		</div>
+
+		<h3>Live Joint Angles</h3>
+		<div class="row" id="anglesRow">
+			<span>S1: <strong id="a1">-</strong></span>
+			<span style="margin-left: 10px">S2: <strong id="a2">-</strong></span>
+			<span style="margin-left: 10px">S3: <strong id="a3">-</strong></span>
+			<span style="margin-left: 10px">S4: <strong id="a4">-</strong></span>
+			<span style="margin-left: 10px">S5: <strong id="a5">-</strong></span>
+			<span style="margin-left: 10px">S6: <strong id="a6">-</strong></span>
+		</div>
+
+		<h3>Manual Control</h3>
+		<div class="row" id="manualRow">
+			<div>
+				<input type="number" id="i1" min="0" max="180" value="90" />
+				<button onclick="nudge(1,-5)">S1 -5</button>
+				<button onclick="nudge(1,5)">S1 +5</button>
+			</div>
+			<div>
+				<input type="number" id="i2" min="0" max="180" value="150" />
+				<button onclick="nudge(2,-5)">S2 -5</button>
+				<button onclick="nudge(2,5)">S2 +5</button>
+			</div>
+			<div>
+				<input type="number" id="i3" min="0" max="180" value="20" />
+				<button onclick="nudge(3,-5)">S3 -5</button>
+				<button onclick="nudge(3,5)">S3 +5</button>
+			</div>
+			<div>
+				<input type="number" id="i4" min="0" max="180" value="20" />
+				<button onclick="nudge(4,-5)">S4 -5</button>
+				<button onclick="nudge(4,5)">S4 +5</button>
+			</div>
+			<div>
+				<input type="number" id="i5" min="0" max="180" value="90" />
+				<button onclick="nudge(5,-5)">S5 -5</button>
+				<button onclick="nudge(5,5)">S5 +5</button>
+			</div>
+			<div>
+				<input type="number" id="i6" min="0" max="180" value="30" />
+				<button onclick="nudge(6,-5)">S6 -5</button>
+				<button onclick="nudge(6,5)">S6 +5</button>
+			</div>
+			<div style="margin-top: 8px">
+				<button onclick="applyAngles()">Apply All</button>
+			</div>
+		</div>
+
+		<script>
+			const $ = (id) => document.getElementById(id);
+			const statusEl = $("status");
+			const logEl = $("log");
+
+			let client = null;
+			let topics = {
+				tx: null,
+				rx: null,
+			};
+
+			function setStatus(text) {
+				statusEl.textContent = text;
+			}
+
+			function log(msg, ok = true) {
+				const t = new Date().toISOString();
+				const line = `[${t}] ${msg}`;
+				const div = document.createElement("div");
+				div.textContent = line;
+				div.className = ok ? "ok" : "err";
+				logEl.appendChild(div);
+				logEl.scrollTop = logEl.scrollHeight;
+			}
+
+			function resolveTopics() {
+				const base = $("baseTopic").value.trim() || "carebot";
+				topics.tx = `${base}/frontend/tx`;
+				topics.rx = `${base}/frontend/rx`;
+			}
+
+			function connect() {
+				if (client) return;
+				resolveTopics();
+				const url = $("brokerUrl").value.trim();
+				const clientId = ($("clientId").value.trim() || "frontend-web") + "-" + Math.random().toString(16).slice(2);
+				try {
+					client = mqtt.connect(url, { clientId, keepalive: 30, reconnectPeriod: 2000 });
+				} catch (e) {
+					log("mqtt connect error: " + e.message, false);
+					return;
+				}
+				client.on("connect", () => {
+					setStatus("connected");
+					log(`connected to ${url} as ${clientId}`);
+					client.subscribe(topics.rx, (err) => {
+						if (err) log("subscribe error: " + err.message, false);
+						else log("subscribed: " + topics.rx);
+					});
+					// hello 전송
+					publish({ type: "hello", agent: "frontend" });
+				});
+				client.on("message", (topic, payload) => {
+					try {
+						const data = JSON.parse(payload.toString());
+						log(`recv ${topic}: ${JSON.stringify(data)}`);
+						if (topic === topics.rx && data && data.type === "joint_state" && Array.isArray(data.angles)) {
+							const a = data.angles;
+							for (let i = 1; i <= 6; i++) {
+								const val = a[i - 1];
+								const el = document.getElementById("a" + i);
+								if (el) el.textContent = val === null || val === undefined ? "-" : String(val);
+							}
+						}
+					} catch (e) {
+						log("recv non-json: " + payload, false);
+					}
+				});
+				client.on("error", (err) => {
+					log("mqtt error: " + err.message, false);
+				});
+				client.on("reconnect", () => log("reconnecting..."));
+				client.on("close", () => {
+					setStatus("disconnected");
+					log("disconnected");
+				});
+			}
+
+			function disconnect() {
+				if (!client) return;
+				try {
+					client.end(true);
+				} catch (e) {}
+				client = null;
+				setStatus("disconnected");
+				log("disconnected by user");
+			}
+
+			function publish(obj) {
+				if (!client) {
+					log("mqtt not connected", false);
+					return;
+				}
+				try {
+					client.publish(topics.tx, JSON.stringify(obj));
+				} catch (e) {
+					log("publish error: " + e.message, false);
+				}
+			}
+
+			function sendCommand(command) {
+				publish({ type: "command", command, who: "frontend" });
+				log("send command: " + command);
+			}
+
+			$("btnConnect").onclick = connect;
+			$("btnDisconnect").onclick = disconnect;
+			$("btnStartTrack").onclick = () => sendCommand("face_tracking");
+			$("btnStopTrack").onclick = () => sendCommand("stop_face_tracking");
+			$("btnInit").onclick = () => sendCommand("init_pose");
+			$("btnHeart").onclick = () => sendCommand("make_heart");
+			$("btnHug").onclick = () => sendCommand("hug");
+
+			// 수동 제어 헬퍼
+			window.nudge = function (id, delta) {
+				publish({ type: "command", command: "nudge_joint", id, delta, who: "frontend" });
+			};
+
+			window.applyAngles = function () {
+				const vals = [];
+				for (let i = 1; i <= 6; i++) {
+					const raw = document.getElementById("i" + i).value;
+					const v = Number.parseInt(raw, 10);
+					vals.push(Number.isNaN(v) ? 0 : Math.max(0, Math.min(180, v)));
+				}
+				publish({ type: "command", command: "set_joints", angles: vals, time_ms: 600, who: "frontend" });
+			};
+		</script>
+	</body>
+</html>
