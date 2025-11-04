@@ -54,13 +54,13 @@ class ArmActions:
         This is adapted from do_actions notebook.
         Returns a short status string.
         """
-        return ActionHeart(self.arm, robot_id=self.robot_id).run(
-            cancel_event=cancel_event
-        )
+        return ActionHeart(
+            self.arm, robot_id=self.robot_id, arm_lock=self._arm_lock
+        ).run(cancel_event=cancel_event)
 
     def hug(self, cancel_event=None) -> str:
         """Perform a gentle 'hug' gesture with the arm and return status."""
-        return ActionHug(self.arm, robot_id=self.robot_id).run(
+        return ActionHug(self.arm, robot_id=self.robot_id, arm_lock=self._arm_lock).run(
             cancel_event=cancel_event
         )
 

@@ -1,13 +1,21 @@
 import time
+import threading
 from typing import Optional
 
 
 class ActionHug:
-    def __init__(self, arm_device, robot_id: Optional[str] = None):
+    def __init__(
+        self,
+        arm_device,
+        robot_id: Optional[str] = None,
+        arm_lock: Optional[threading.Lock] = None,
+    ):
         if arm_device is None:
             raise RuntimeError("arm_device is required")
         self.arm = arm_device
         self.robot_id = robot_id
+        # Arm_Lib I/O 직렬화를 위한 잠금 (텔레메트리/다른 쓰레드와 경합 방지)
+        self._arm_lock = arm_lock or threading.Lock()
 
     def _sleep_interruptible(self, seconds: float, cancel_event) -> bool:
         if cancel_event is None:
@@ -41,12 +49,20 @@ class ActionHug:
                 close_pose = [90, 160, 35, 35, 100, 40]
 
             # 펼치기
-            self.arm.Arm_serial_servo_write6_array(open_pose, 1200)
+            try:
+                with self._arm_lock:
+                    self.arm.Arm_serial_servo_write6_array(open_pose, 1200)
+            except Exception:
+                pass
             if not self._sleep_interruptible(1.2, cancel_event):
                 return "hug_cancelled"
 
             # 끌어안기
-            self.arm.Arm_serial_servo_write6_array(close_pose, 1500)
+            try:
+                with self._arm_lock:
+                    self.arm.Arm_serial_servo_write6_array(close_pose, 1500)
+            except Exception:
+                pass
             if not self._sleep_interruptible(1.5, cancel_event):
                 return "hug_cancelled"
 
@@ -55,7 +71,11 @@ class ActionHug:
                 return "hug_cancelled"
 
             # 복귀
-            self.arm.Arm_serial_servo_write6_array(neutral, 1200)
+            try:
+                with self._arm_lock:
+                    self.arm.Arm_serial_servo_write6_array(neutral, 1200)
+            except Exception:
+                pass
             if not self._sleep_interruptible(1.2, cancel_event):
                 return "hug_cancelled"
         except Exception:

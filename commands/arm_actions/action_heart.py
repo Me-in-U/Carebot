@@ -1,14 +1,22 @@
 import time
+import threading
 from typing import Optional
 
 
 class ActionHeart:
-    def __init__(self, arm_device, robot_id: Optional[str] = None):
+    def __init__(
+        self,
+        arm_device,
+        robot_id: Optional[str] = None,
+        arm_lock: Optional[threading.Lock] = None,
+    ):
         if arm_device is None:
             raise RuntimeError("arm_device is required")
         self.arm = arm_device
         # 로봇 구분 (robot_left / robot_right). 기본값은 None -> 공통 동작
         self.robot_id = robot_id
+        # Arm_Lib I/O 직렬화를 위한 잠금 (텔레메트리/다른 쓰레드와 경합 방지)
+        self._arm_lock = arm_lock or threading.Lock()
 
     def _sleep_interruptible(self, seconds: float, cancel_event) -> bool:
         """Sleep in small steps; return False if cancelled during sleep."""
@@ -53,7 +61,11 @@ class ActionHeart:
             neutral = [90, 150, 20, 20, 90, 30]
 
             # 단계 1: 포즈1
-            self.arm.Arm_serial_servo_write6_array(pose1, time_ms)
+            try:
+                with self._arm_lock:
+                    self.arm.Arm_serial_servo_write6_array(pose1, time_ms)
+            except Exception:
+                pass
             if not self._sleep_interruptible(time_ms / 1000.0, cancel_event):
                 return "heart_cancelled"
 
@@ -62,7 +74,11 @@ class ActionHeart:
                 return "heart_cancelled"
 
             # 단계 2: 포즈2 (하트 마무리)
-            self.arm.Arm_serial_servo_write6_array(pose2, time_ms)
+            try:
+                with self._arm_lock:
+                    self.arm.Arm_serial_servo_write6_array(pose2, time_ms)
+            except Exception:
+                pass
             if not self._sleep_interruptible(time_ms / 1000.0, cancel_event):
                 return "heart_cancelled"
 
@@ -71,7 +87,11 @@ class ActionHeart:
                 return "heart_cancelled"
 
             # 복귀: 뉴트럴 포즈
-            self.arm.Arm_serial_servo_write6_array(neutral, time_ms)
+            try:
+                with self._arm_lock:
+                    self.arm.Arm_serial_servo_write6_array(neutral, time_ms)
+            except Exception:
+                pass
             if not self._sleep_interruptible(time_ms / 1000.0, cancel_event):
                 return "heart_cancelled"
         except Exception:
