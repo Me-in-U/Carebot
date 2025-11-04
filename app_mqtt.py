@@ -43,26 +43,20 @@ class CarebotAppMQTT:
         self._config = dict(cfg)
 
         # MQTT 구성
-        self.mqtt_host = os.getenv(
-            "CAREBOT_MQTT_HOST", cfg.get("mqtt_host", "192.168.91.1")
-        )
-        self.mqtt_port = int(os.getenv("CAREBOT_MQTT_PORT", cfg.get("mqtt_port", 1883)))
-        self.mqtt_base = os.getenv("CAREBOT_MQTT_BASE", cfg.get("mqtt_base", "carebot"))
-        self.mqtt_qos = int(os.getenv("CAREBOT_MQTT_QOS", cfg.get("mqtt_qos", 0)))
+        self.mqtt_host = cfg.get("mqtt_host", "192.168.91.1")
+        self.mqtt_port = int(cfg.get("mqtt_port", 1883))
+        self.mqtt_base = cfg.get("mqtt_base", "carebot")
+        self.mqtt_qos = int(cfg.get("mqtt_qos", 0))
 
-        # 다중 로봇 구분용 ID (환경변수 우선)
-        self.robot_id = os.getenv("CAREBOT_ROBOT_ID", cfg.get("robot_id", "robot_left"))
+        # 다중 로봇 구분용 ID (config)
+        self.robot_id = cfg.get("robot_id", "robot_left")
 
-        # Arm 시리얼 포트(by-path 권장): 환경변수 > 단일 키 > 좌/우 전용 키 순으로 매핑
+        # Arm 시리얼 포트(by-path 권장): 단일 키 > 좌/우 전용 키 순으로 매핑
         # 예: /dev/serial/by-path/pci-0000:03:00.0-usb-0:1.2:1.0-port0
-        self.arm_port = (
-            os.getenv("CAREBOT_ARM_PORT")
-            or cfg.get("arm_port")
-            or (
-                cfg.get("arm_port_left")
-                if self.robot_id == "robot_left"
-                else cfg.get("arm_port_right")
-            )
+        self.arm_port = cfg.get("arm_port") or (
+            cfg.get("arm_port_left")
+            if self.robot_id == "robot_left"
+            else cfg.get("arm_port_right")
         )
         if isinstance(self.arm_port, str):
             self.arm_port = self.arm_port.strip() or None
@@ -78,8 +72,6 @@ class CarebotAppMQTT:
 
         camera_index = int(cfg.get("camera_index", 0))
         update_interval_ms = int(cfg.get("update_interval_ms", 200))
-
-        # LED 관련 기능 제거 (모션 I/O 안정성 우선)
 
         # 로봇팔 및 컨트롤러 초기화
         self.arm = None
@@ -150,8 +142,7 @@ class CarebotAppMQTT:
 
         # MQTT 클라이언트 (paho-mqtt 2.x 권장 콜백 API 사용, 하위호환 처리)
         # 인스턴스마다 고유 client_id 사용 (동일 ID 중복 접속 시 기존 연결이 끊김)
-        default_client_id = f"carebot-app-{self.robot_id}-{os.getpid()}"
-        client_id = os.getenv("CAREBOT_MQTT_CLIENT_ID", default_client_id)
+        client_id = f"carebot-app-{self.robot_id}-{os.getpid()}"
         try:
             self.client = mqtt.Client(
                 client_id=client_id,
@@ -420,7 +411,6 @@ class CarebotAppMQTT:
                     "error": "arm_unavailable",
                 }
             )
-            self._led_set(0, 50, 0)
             return
         sid = data.get("id") or data.get("sid")
         angle = data.get("angle")
@@ -749,55 +739,5 @@ class CarebotAppMQTT:
 
 if __name__ == "__main__":
     base = os.path.dirname(os.path.abspath(__file__))
-
-    # 간단한 CLI 오버라이드 파서: key=value 형식으로 환경변수를 설정해 편의 제공
-    # 예) python app_mqtt.py which_arm=left mqtt_host=127.0.0.1 mqtt_port=1883
-    args = sys.argv[1:]
-    for arg in args:
-        if arg in ("-h", "--help", "help"):
-            print(
-                "\nCarebot app (MQTT) CLI overrides:\n"
-                "  which_arm=left|right   -> CAREBOT_ROBOT_ID=robot_left|robot_right\n"
-                "  robot_id=...           -> CAREBOT_ROBOT_ID=... (left/right도 허용)\n"
-                "  arm_port=COM3          -> CAREBOT_ARM_PORT=COM3 (Windows)\n"
-                "  mqtt_host=127.0.0.1    -> CAREBOT_MQTT_HOST\n"
-                "  mqtt_port=1883         -> CAREBOT_MQTT_PORT\n"
-                "  mqtt_base=carebot      -> CAREBOT_MQTT_BASE\n"
-                "  mqtt_qos=0             -> CAREBOT_MQTT_QOS\n"
-                "\n예시:\n  python Carebot\\app_mqtt.py which_arm=left mqtt_host=127.0.0.1 mqtt_port=1883\n"
-            )
-            sys.exit(0)
-        if "=" not in arg:
-            continue
-        k, v = arg.split("=", 1)
-        k = (k or "").strip().lower()
-        v = (v or "").strip()
-        if not k:
-            continue
-        if k in {"which_arm", "arm"}:
-            vv = v.lower()
-            if vv in {"left", "robot_left"}:
-                os.environ["CAREBOT_ROBOT_ID"] = "robot_left"
-            elif vv in {"right", "robot_right"}:
-                os.environ["CAREBOT_ROBOT_ID"] = "robot_right"
-        elif k == "robot_id":
-            vv = v.lower()
-            if vv in {"left", "robot_left"}:
-                os.environ["CAREBOT_ROBOT_ID"] = "robot_left"
-            elif vv in {"right", "robot_right"}:
-                os.environ["CAREBOT_ROBOT_ID"] = "robot_right"
-            else:
-                os.environ["CAREBOT_ROBOT_ID"] = v
-        elif k == "arm_port":
-            os.environ["CAREBOT_ARM_PORT"] = v
-        elif k == "mqtt_host":
-            os.environ["CAREBOT_MQTT_HOST"] = v
-        elif k == "mqtt_port":
-            os.environ["CAREBOT_MQTT_PORT"] = v
-        elif k == "mqtt_base":
-            os.environ["CAREBOT_MQTT_BASE"] = v
-        elif k == "mqtt_qos":
-            os.environ["CAREBOT_MQTT_QOS"] = v
-
     app = CarebotAppMQTT(config_path=os.path.join(base, "config.json"))
     app.run()

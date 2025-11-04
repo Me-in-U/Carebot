@@ -1,4 +1,9 @@
 {
+	"mqtt_host": "192.168.91.1",
+	"mqtt_port": 1883,
+	"mqtt_base": "carebot",
+	"mqtt_qos": 0,
+	"robot_id": "robot_left",
 	"ws_url": "ws://127.0.0.1:8765/ws",
 	"camera_index": 0,
 	"update_interval_ms": 200,
@@ -6,6 +11,7 @@
 	"heart_hold_between_s": 0.3,
 	"heart_hold_final_s": 0.4,
 	"heart_hold_neutral_s": 1.2,
+	"arm_port": "",
 	"arm_port_left": "/dev/serial/by-path/pci-0000:03:00.0-usb-0:1.2:1.0-port0",
 	"arm_port_right": "/dev/serial/by-path/pci-0000:03:00.0-usb-0:1.3:1.0-port0"
 }
