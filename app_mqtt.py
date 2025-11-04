@@ -136,7 +136,7 @@ class CarebotAppMQTT:
         userdata: Any,
         flags: dict,
         rc: int,
-        properties: Any | None = None,
+        properties: Optional[Any] = None,
     ):
         self.log.info("mqtt connected rc=%s", rc)
         client.subscribe(self.topic_carebot_rx, qos=self.mqtt_qos)
@@ -156,7 +156,7 @@ class CarebotAppMQTT:
         )
 
     def _on_disconnect(
-        self, client: mqtt.Client, userdata: Any, rc: int, properties: Any | None = None
+        self, client: mqtt.Client, userdata: Any, rc: int, properties: Optional[Any] = None
     ):
         self.log.info("mqtt disconnected rc=%s", rc)
 
