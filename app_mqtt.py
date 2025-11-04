@@ -50,6 +50,20 @@ class CarebotAppMQTT:
         # 다중 로봇 구분용 ID (환경변수 우선)
         self.robot_id = os.getenv("CAREBOT_ROBOT_ID", cfg.get("robot_id", "robot_left"))
 
+        # Arm 시리얼 포트(by-path 권장): 환경변수 > 단일 키 > 좌/우 전용 키 순으로 매핑
+        # 예: /dev/serial/by-path/pci-0000:03:00.0-usb-0:1.2:1.0-port0
+        self.arm_port = (
+            os.getenv("CAREBOT_ARM_PORT")
+            or cfg.get("arm_port")
+            or (
+                cfg.get("arm_port_left")
+                if self.robot_id == "robot_left"
+                else cfg.get("arm_port_right")
+            )
+        )
+        if isinstance(self.arm_port, str):
+            self.arm_port = self.arm_port.strip() or None
+
         self.topic_frontend_rx = f"{self.mqtt_base}/frontend/rx"
         self.topic_frontend_tx = f"{self.mqtt_base}/frontend/tx"
         self.topic_carebot_rx = (
@@ -68,7 +82,17 @@ class CarebotAppMQTT:
         self._last_manual_ts = 0.0
         try:
             if Arm_Lib is not None:
-                self.arm = Arm_Lib.Arm_Device()
+                if self.arm_port:
+                    # Arm_Lib 구현에 따라 키워드/위치 인자 모두 시도
+                    try:
+                        self.arm = Arm_Lib.Arm_Device(port=self.arm_port)  # type: ignore[arg-type]
+                    except TypeError:
+                        try:
+                            self.arm = Arm_Lib.Arm_Device(self.arm_port)  # type: ignore[misc]
+                        except Exception:
+                            self.arm = Arm_Lib.Arm_Device()
+                else:
+                    self.arm = Arm_Lib.Arm_Device()
         except Exception:
             self.arm = None
 
@@ -106,13 +130,14 @@ class CarebotAppMQTT:
                 pass
 
         self.log.info(
-            "initialized | mqtt=%s:%s base=%s, cam=%s, interval_ms=%s, arm=%s",
+            "initialized | mqtt=%s:%s base=%s, cam=%s, interval_ms=%s, arm=%s, port=%s",
             self.mqtt_host,
             self.mqtt_port,
             self.mqtt_base,
             camera_index,
             update_interval_ms,
             "yes" if self.arm is not None else "no",
+            self.arm_port or "default",
         )
         if self.arm is not None:
             self._start_joint_stream(interval_ms=update_interval_ms)
