@@ -1,4 +1,5 @@
 import time
+import os
 import threading
 from typing import Optional
 
@@ -90,25 +91,49 @@ class ActionHeart:
                 poses = left_poses
 
             neutral = [90, 150, 20, 20, 90, 30]
-            time_ms = 1200
+            # 타이밍 파라미터(환경변수로 조절 가능)
+            #  - CAREBOT_HEART_MOVE_MS: 각 단계 이동 시간(ms) [기본 1200]
+            #  - CAREBOT_HEART_HOLD_BETWEEN_S: 단계 사이 짧은 유지(sec) [기본 0.3]
+            #  - CAREBOT_HEART_HOLD_FINAL_S: 마지막 단계 후 유지(sec) [기본 0.4]
+            #  - CAREBOT_HEART_HOLD_NEUTRAL_S: 뉴트럴 복귀 후 유지(sec) [기본: move_ms/1000]
+            try:
+                move_ms = int(os.getenv("CAREBOT_HEART_MOVE_MS", "1200"))
+            except Exception:
+                move_ms = 1200
+            try:
+                hold_between_s = float(os.getenv("CAREBOT_HEART_HOLD_BETWEEN_S", "0.3"))
+            except Exception:
+                hold_between_s = 0.3
+            try:
+                hold_final_s = float(os.getenv("CAREBOT_HEART_HOLD_FINAL_S", "0.4"))
+            except Exception:
+                hold_final_s = 0.4
+            try:
+                hold_neutral_s = float(
+                    os.getenv(
+                        "CAREBOT_HEART_HOLD_NEUTRAL_S", str(max(0.0, move_ms / 1000.0))
+                    )
+                )
+            except Exception:
+                hold_neutral_s = max(0.0, move_ms / 1000.0)
 
             # 단계별 수행
             for i, pose in enumerate(poses):
-                self._write6_reliable(pose, time_ms)
-                if not self._sleep_interruptible(time_ms / 1000.0, cancel_event):
+                self._write6_reliable(pose, move_ms)
+                if not self._sleep_interruptible(move_ms / 1000.0, cancel_event):
                     return "heart_cancelled"
                 # 단계 사이 짧은 유지
                 if i < len(poses) - 1:
-                    if not self._sleep_interruptible(0.3, cancel_event):
+                    if not self._sleep_interruptible(hold_between_s, cancel_event):
                         return "heart_cancelled"
 
             # 마지막 잠깐 유지
-            if not self._sleep_interruptible(0.4, cancel_event):
+            if not self._sleep_interruptible(hold_final_s, cancel_event):
                 return "heart_cancelled"
 
             # 복귀: 뉴트럴 포즈
-            self._write6_reliable(neutral, time_ms)
-            if not self._sleep_interruptible(time_ms / 1000.0, cancel_event):
+            self._write6_reliable(neutral, move_ms)
+            if not self._sleep_interruptible(hold_neutral_s, cancel_event):
                 return "heart_cancelled"
         except Exception:
             # 하드웨어가 없더라도 상위 흐름을 막지 않음
