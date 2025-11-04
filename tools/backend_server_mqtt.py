@@ -91,10 +91,10 @@ class MQTTHub:
     ):
         print(f"[mqtt-backend] disconnected rc={rc}")
 
-    def _safe_pub(self, topic: str, payload: dict):
+    def _safe_pub(self, topic: str, payload: dict, retain: bool = False):
         try:
             data = json.dumps(payload)
-            self.client.publish(topic, data, qos=self.qos)
+            self.client.publish(topic, data, qos=self.qos, retain=retain)
         except Exception as e:
             print(f"[mqtt-backend] publish error to {topic}: {e}")
 
@@ -182,7 +182,8 @@ class MQTTHub:
             out = dict(payload)
             if "who_hop" not in out:
                 out["who_hop"] = "backend->frontends"
-            self._safe_pub(self.topic_frontend_rx, out)
+            retain = bool(out.get("type") == "joint_state")
+            self._safe_pub(self.topic_frontend_rx, out, retain=retain)
             return
 
 

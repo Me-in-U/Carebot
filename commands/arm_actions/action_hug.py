@@ -1,11 +1,13 @@
 import time
+from typing import Optional
 
 
 class ActionHug:
-    def __init__(self, arm_device):
+    def __init__(self, arm_device, robot_id: Optional[str] = None):
         if arm_device is None:
             raise RuntimeError("arm_device is required")
         self.arm = arm_device
+        self.robot_id = robot_id
 
     def _sleep_interruptible(self, seconds: float, cancel_event) -> bool:
         if cancel_event is None:
@@ -20,26 +22,40 @@ class ActionHug:
         return True
 
     def run(self, cancel_event=None) -> str:
-        """Perform a gentle 'hug' like gesture and return status string.
+        """부드러운 '포옹' 제스처 수행 후 상태 문자열 반환 (좌/우 로봇에 맞게 미러링).
 
-        Note: This is a conservative example sequence. Adjust joint values to match your hardware's safe range.
+        하드웨어 안전 범위에 맞춰 각도를 조정해 사용하세요.
         """
         try:
-            # Open arms slightly (spread) then bring forward as if hugging
-            self.arm.Arm_serial_servo_write6_array([90, 120, 20, 20, 70, 20], 1200)
+            neutral = [90, 150, 20, 20, 90, 30]
+
+            # 좌/우 로봇별 팔 벌리기/모으기에서 손목/팔각 미세 차등
+            if self.robot_id == "robot_left":
+                open_pose = [90, 120, 20, 20, 70, 20]
+                close_pose = [90, 160, 35, 35, 95, 40]
+            elif self.robot_id == "robot_right":
+                open_pose = [90, 120, 20, 20, 110, 20]
+                close_pose = [90, 160, 35, 35, 105, 40]
+            else:
+                open_pose = [90, 120, 20, 20, 90, 20]
+                close_pose = [90, 160, 35, 35, 100, 40]
+
+            # 펼치기
+            self.arm.Arm_serial_servo_write6_array(open_pose, 1200)
             if not self._sleep_interruptible(1.2, cancel_event):
                 return "hug_cancelled"
 
-            self.arm.Arm_serial_servo_write6_array([90, 160, 35, 35, 100, 40], 1500)
+            # 끌어안기
+            self.arm.Arm_serial_servo_write6_array(close_pose, 1500)
             if not self._sleep_interruptible(1.5, cancel_event):
                 return "hug_cancelled"
 
-            # Hold the pose briefly
+            # 잠시 유지
             if not self._sleep_interruptible(0.8, cancel_event):
                 return "hug_cancelled"
 
-            # Return to neutral
-            self.arm.Arm_serial_servo_write6_array([90, 150, 20, 20, 90, 30], 1200)
+            # 복귀
+            self.arm.Arm_serial_servo_write6_array(neutral, 1200)
             if not self._sleep_interruptible(1.2, cancel_event):
                 return "hug_cancelled"
         except Exception:

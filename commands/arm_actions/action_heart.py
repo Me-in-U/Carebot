@@ -1,11 +1,14 @@
 import time
+from typing import Optional
 
 
 class ActionHeart:
-    def __init__(self, arm_device):
+    def __init__(self, arm_device, robot_id: Optional[str] = None):
         if arm_device is None:
             raise RuntimeError("arm_device is required")
         self.arm = arm_device
+        # 로봇 구분 (robot_left / robot_right). 기본값은 None -> 공통 동작
+        self.robot_id = robot_id
 
     def _sleep_interruptible(self, seconds: float, cancel_event) -> bool:
         """Sleep in small steps; return False if cancelled during sleep."""
@@ -21,26 +24,58 @@ class ActionHeart:
         return True
 
     def run(self, cancel_event=None) -> str:
-        """Perform a simple 'heart' gesture and return status string.
+        """'하트' 제스처 수행 (로봇 좌/우에 따라 약간 다르게 동작) 후 상태 문자열 반환.
 
-        If cancel_event is set during execution, abort early and return 'heart_cancelled'.
+        - robot_left: 왼팔 기준의 미러 포즈
+        - robot_right: 오른팔 기준의 미러 포즈
+        - 그 외/미지정: 공통 기본 포즈
+
+        cancel_event 가 설정되면 즉시 중단하고 'heart_cancelled' 반환.
         """
-        time_ms = 2000
-        sleep_s = 2.0
-
-        # Example pose adapted from existing notebook/codebase
-        # Arm.Arm_serial_servo_write6(id, s1, s2, s3, s4, s5, time)
         try:
-            self.arm.Arm_serial_servo_write6(0, 48, 45, -20, 0, 180, time_ms)
-            if not self._sleep_interruptible(sleep_s, cancel_event):
+            # 안전한 기본 시간/대기
+            time_ms = 1400
+
+            # 좌/우 로봇별로 미세하게 다른 포즈를 사용 (하드웨어에 맞춰 조정 가능)
+            if self.robot_id == "robot_left":
+                # 왼쪽 로봇: 손목(5번) 각도를 왼쪽 방향으로, 약간 낮게
+                pose1 = [85, 135, 30, 30, 60, 35]
+                pose2 = [85, 150, 38, 38, 70, 40]
+            elif self.robot_id == "robot_right":
+                # 오른쪽 로봇: 손목(5번) 각도를 오른쪽 방향으로, 약간 낮게
+                pose1 = [95, 135, 30, 30, 120, 35]
+                pose2 = [95, 150, 38, 38, 110, 40]
+            else:
+                # 기본(공통) 포즈
+                pose1 = [90, 140, 32, 32, 90, 35]
+                pose2 = [90, 150, 38, 38, 90, 40]
+
+            neutral = [90, 150, 20, 20, 90, 30]
+
+            # 단계 1: 포즈1
+            self.arm.Arm_serial_servo_write6_array(pose1, time_ms)
+            if not self._sleep_interruptible(time_ms / 1000.0, cancel_event):
                 return "heart_cancelled"
 
-            # Return to a neutral-ish pose
-            self.arm.Arm_serial_servo_write6_array([90, 150, 20, 20, 90, 30], time_ms)
-            if not self._sleep_interruptible(sleep_s, cancel_event):
+            # 짧은 유지
+            if not self._sleep_interruptible(0.4, cancel_event):
+                return "heart_cancelled"
+
+            # 단계 2: 포즈2 (하트 마무리)
+            self.arm.Arm_serial_servo_write6_array(pose2, time_ms)
+            if not self._sleep_interruptible(time_ms / 1000.0, cancel_event):
+                return "heart_cancelled"
+
+            # 잠깐 유지
+            if not self._sleep_interruptible(0.6, cancel_event):
+                return "heart_cancelled"
+
+            # 복귀: 뉴트럴 포즈
+            self.arm.Arm_serial_servo_write6_array(neutral, time_ms)
+            if not self._sleep_interruptible(time_ms / 1000.0, cancel_event):
                 return "heart_cancelled"
         except Exception:
-            # Allow upper layer to proceed even if hardware is absent
+            # 하드웨어가 없더라도 상위 흐름을 막지 않음
             pass
 
         return "heart_completed"

@@ -1,3 +1,4 @@
+import os
 import time
 from typing import Optional
 import threading
@@ -8,7 +9,12 @@ from .action_init_pose import ActionInitPose
 
 
 class ArmActions:
-    def __init__(self, arm_device, arm_lock: Optional[threading.Lock] = None):
+    def __init__(
+        self,
+        arm_device,
+        arm_lock: Optional[threading.Lock] = None,
+        robot_id: Optional[str] = None,
+    ):
         """Wrap high-level arm actions around an already-initialized arm device.
 
         arm_device should be an instance compatible with Arm_Lib.Arm_Device().
@@ -18,6 +24,8 @@ class ArmActions:
         self.arm = arm_device
         # Shared lock to serialize all Arm_Lib I/O (reads and writes)
         self._arm_lock = arm_lock or threading.Lock()
+        # 이 인스턴스가 제어하는 로봇 ID (robot_left / robot_right)
+        self.robot_id = robot_id or os.getenv("CAREBOT_ROBOT_ID")
 
     def set_ready_pose(self, time_ms: int = 1500):
         """Move arm to a neutral/ready pose."""
@@ -46,11 +54,15 @@ class ArmActions:
         This is adapted from do_actions notebook.
         Returns a short status string.
         """
-        return ActionHeart(self.arm).run(cancel_event=cancel_event)
+        return ActionHeart(self.arm, robot_id=self.robot_id).run(
+            cancel_event=cancel_event
+        )
 
     def hug(self, cancel_event=None) -> str:
         """Perform a gentle 'hug' gesture with the arm and return status."""
-        return ActionHug(self.arm).run(cancel_event=cancel_event)
+        return ActionHug(self.arm, robot_id=self.robot_id).run(
+            cancel_event=cancel_event
+        )
 
     def init_pose(self, cancel_event=None) -> str:
         """Move the arm to a conservative initial/ready pose.

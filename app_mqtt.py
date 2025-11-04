@@ -47,6 +47,9 @@ class CarebotAppMQTT:
         self.mqtt_base = os.getenv("CAREBOT_MQTT_BASE", cfg.get("mqtt_base", "carebot"))
         self.mqtt_qos = int(os.getenv("CAREBOT_MQTT_QOS", cfg.get("mqtt_qos", 0)))
 
+        # 다중 로봇 구분용 ID (환경변수 우선)
+        self.robot_id = os.getenv("CAREBOT_ROBOT_ID", cfg.get("robot_id", "robot_left"))
+
         self.topic_frontend_rx = f"{self.mqtt_base}/frontend/rx"
         self.topic_frontend_tx = f"{self.mqtt_base}/frontend/tx"
         self.topic_carebot_rx = (
@@ -71,7 +74,11 @@ class CarebotAppMQTT:
 
         try:
             self.actions = (
-                ArmActions(arm_device=self.arm, arm_lock=self._arm_io_lock)
+                ArmActions(
+                    arm_device=self.arm,
+                    arm_lock=self._arm_io_lock,
+                    robot_id=self.robot_id,
+                )
                 if self.arm is not None
                 else None
             )
@@ -151,12 +158,17 @@ class CarebotAppMQTT:
                 "type": "hello",
                 "ts": now_iso(),
                 "agent": "carebot",
+                "robot_id": self.robot_id,
                 "capabilities": capabilities,
             }
         )
 
     def _on_disconnect(
-        self, client: mqtt.Client, userdata: Any, rc: int, properties: Optional[Any] = None
+        self,
+        client: mqtt.Client,
+        userdata: Any,
+        rc: int,
+        properties: Optional[Any] = None,
     ):
         self.log.info("mqtt disconnected rc=%s", rc)
 
@@ -167,6 +179,11 @@ class CarebotAppMQTT:
             self._send({"type": "error", "ts": now_iso(), "error": "invalid_json"})
             return
         self.log.info("mqtt recv on %s: %s", msg.topic, data)
+
+        # 다중 로봇: robot_id가 지정되어 있고, 내 로봇이 아니면 무시 (broadcast: 'all' 허용)
+        rid = data.get("robot_id")
+        if rid not in (None, "", self.robot_id, "all"):
+            return
 
         # 명령만 수락 (WS 로직과 동일)
         msg_type = data.get("type")
@@ -571,6 +588,7 @@ class CarebotAppMQTT:
         try:
             payload = dict(obj)
             payload.setdefault("who", "carebot")
+            payload.setdefault("robot_id", self.robot_id)
             self.client.publish(
                 self.topic_carebot_tx, json.dumps(payload), qos=self.mqtt_qos
             )
@@ -581,19 +599,33 @@ class CarebotAppMQTT:
         if getattr(self, "_telemetry_thread", None):
             return
         self._telemetry_stop = threading.Event()
+        self._telemetry_seq = 0
 
         def _loop():
             last = [None] * 6
             first_sent = False
             force_interval_s = 1.0
             last_force = 0.0
+            min_delta = 1.0  # 도메인 노이즈 억제를 위한 최소 변화 각도(도)
             while not self._telemetry_stop.is_set():
+                # 활동/유휴에 따라 샘플링 주기 가변
+                now_t = time.time()
+                is_active = (now_t - getattr(self, "_last_manual_ts", 0.0)) < 3.0
+                sleep_sec = (
+                    (interval_ms / 1000.0)
+                    if is_active
+                    else max(0.3, (interval_ms * 2) / 1000.0)
+                )
                 if self.arm is not None:
 
-                    def _read_angles() -> Optional[list]:
+                    def _read_angles(force: bool = False) -> Optional[list]:
                         try:
                             res = []
-                            acquired = self._arm_io_lock.acquire(timeout=0.2)
+                            acquired = False
+                            if force:
+                                acquired = self._arm_io_lock.acquire(timeout=0.2)
+                            else:
+                                acquired = self._arm_io_lock.acquire(blocking=False)
                             if not acquired:
                                 return None
                             try:
@@ -610,27 +642,44 @@ class CarebotAppMQTT:
                         except Exception:
                             return None
 
-                    angles = _read_angles()
-                    now_t = time.time()
+                    # 평시엔 non-blocking, 주기적으로 강제 스냅샷(blocking)
+                    force = (now_t - last_force) >= force_interval_s
+                    angles = _read_angles(force=force)
                     if angles is not None:
                         should_send = False
                         if not first_sent:
                             should_send = True
-                        elif angles != last:
-                            should_send = True
-                        elif (now_t - last_force) >= force_interval_s:
-                            should_send = True
+                        else:
+                            # min_delta 기준 변화 체크
+                            for i in range(6):
+                                a_new = angles[i]
+                                a_old = last[i]
+                                if a_new is None or a_old is None:
+                                    if a_new != a_old:
+                                        should_send = True
+                                        break
+                                else:
+                                    if abs(a_new - a_old) >= min_delta:
+                                        should_send = True
+                                        break
+                            # 강제 스냅샷 타이밍에는 한번 보내기
+                            if not should_send and force:
+                                should_send = True
                         if should_send:
                             payload = {
                                 "type": "joint_state",
                                 "angles": angles,
                                 "ts": now_iso(),
+                                "robot_id": self.robot_id,
+                                "seq": self._telemetry_seq,
                             }
+                            # 텔레메트리는 retain=True 권장 (백엔드에서 retain 전달 필요)
                             self._send(payload)
+                            self._telemetry_seq += 1
                             last = list(angles)
                             last_force = now_t
                             first_sent = True
-                time.sleep(max(0.1, interval_ms / 1000.0))
+                time.sleep(max(0.08, sleep_sec))
 
         t = threading.Thread(target=_loop, name="JointTelemetry", daemon=True)
         self._telemetry_thread = t

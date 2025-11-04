@@ -86,75 +86,136 @@
 			<span class="pill" id="role">frontend</span>
 		</div>
 
-		<div class="row">
-			<button id="btnStartTrack">Start Tracking</button>
-			<button id="btnStopTrack">Stop Tracking</button>
-			<button id="btnInit">Init Pose</button>
-			<button id="btnHeart">Make Heart</button>
-			<button id="btnHug">Hug</button>
+		<div class="row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start">
+			<div id="panelLeft" style="border: 1px solid #ddd; padding: 12px; border-radius: 8px">
+				<h3>Left Robot <span class="pill">robot_left</span></h3>
+				<div class="row">
+					<button id="l_btnStartTrack">Start Tracking</button>
+					<button id="l_btnStopTrack">Stop Tracking</button>
+					<button id="l_btnInit">Init Pose</button>
+					<button id="l_btnHeart">Make Heart</button>
+					<button id="l_btnHug">Hug</button>
+				</div>
+				<h4>Live Joint Angles</h4>
+				<div class="row">
+					<span>S1: <strong id="l_a1">-</strong></span>
+					<span style="margin-left: 10px">S2: <strong id="l_a2">-</strong></span>
+					<span style="margin-left: 10px">S3: <strong id="l_a3">-</strong></span>
+					<span style="margin-left: 10px">S4: <strong id="l_a4">-</strong></span>
+					<span style="margin-left: 10px">S5: <strong id="l_a5">-</strong></span>
+					<span style="margin-left: 10px">S6: <strong id="l_a6">-</strong></span>
+				</div>
+				<h4>Manual Control</h4>
+				<div class="row">
+					<div>
+						<input type="number" id="l_i1" min="0" max="180" value="90" />
+						<button onclick="nudgeLeft(1,-5)">S1 -5</button>
+						<button onclick="nudgeLeft(1,5)">S1 +5</button>
+					</div>
+					<div>
+						<input type="number" id="l_i2" min="0" max="180" value="150" />
+						<button onclick="nudgeLeft(2,-5)">S2 -5</button>
+						<button onclick="nudgeLeft(2,5)">S2 +5</button>
+					</div>
+					<div>
+						<input type="number" id="l_i3" min="0" max="180" value="20" />
+						<button onclick="nudgeLeft(3,-5)">S3 -5</button>
+						<button onclick="nudgeLeft(3,5)">S3 +5</button>
+					</div>
+					<div>
+						<input type="number" id="l_i4" min="0" max="180" value="20" />
+						<button onclick="nudgeLeft(4,-5)">S4 -5</button>
+						<button onclick="nudgeLeft(4,5)">S4 +5</button>
+					</div>
+					<div>
+						<input type="number" id="l_i5" min="0" max="180" value="90" />
+						<button onclick="nudgeLeft(5,-5)">S5 -5</button>
+						<button onclick="nudgeLeft(5,5)">S5 +5</button>
+					</div>
+					<div>
+						<input type="number" id="l_i6" min="0" max="180" value="30" />
+						<button onclick="nudgeLeft(6,-5)">S6 -5</button>
+						<button onclick="nudgeLeft(6,5)">S6 +5</button>
+					</div>
+					<div style="margin-top: 8px">
+						<button onclick="applyAnglesLeft()">Apply All</button>
+					</div>
+				</div>
+			</div>
+
+			<div id="panelRight" style="border: 1px solid #ddd; padding: 12px; border-radius: 8px">
+				<h3>Right Robot <span class="pill">robot_right</span></h3>
+				<div class="row">
+					<button id="r_btnStartTrack">Start Tracking</button>
+					<button id="r_btnStopTrack">Stop Tracking</button>
+					<button id="r_btnInit">Init Pose</button>
+					<button id="r_btnHeart">Make Heart</button>
+					<button id="r_btnHug">Hug</button>
+				</div>
+				<h4>Live Joint Angles</h4>
+				<div class="row">
+					<span>S1: <strong id="r_a1">-</strong></span>
+					<span style="margin-left: 10px">S2: <strong id="r_a2">-</strong></span>
+					<span style="margin-left: 10px">S3: <strong id="r_a3">-</strong></span>
+					<span style="margin-left: 10px">S4: <strong id="r_a4">-</strong></span>
+					<span style="margin-left: 10px">S5: <strong id="r_a5">-</strong></span>
+					<span style="margin-left: 10px">S6: <strong id="r_a6">-</strong></span>
+				</div>
+				<h4>Manual Control</h4>
+				<div class="row">
+					<div>
+						<input type="number" id="r_i1" min="0" max="180" value="90" />
+						<button onclick="nudgeRight(1,-5)">S1 -5</button>
+						<button onclick="nudgeRight(1,5)">S1 +5</button>
+					</div>
+					<div>
+						<input type="number" id="r_i2" min="0" max="180" value="150" />
+						<button onclick="nudgeRight(2,-5)">S2 -5</button>
+						<button onclick="nudgeRight(2,5)">S2 +5</button>
+					</div>
+					<div>
+						<input type="number" id="r_i3" min="0" max="180" value="20" />
+						<button onclick="nudgeRight(3,-5)">S3 -5</button>
+						<button onclick="nudgeRight(3,5)">S3 +5</button>
+					</div>
+					<div>
+						<input type="number" id="r_i4" min="0" max="180" value="20" />
+						<button onclick="nudgeRight(4,-5)">S4 -5</button>
+						<button onclick="nudgeRight(4,5)">S4 +5</button>
+					</div>
+					<div>
+						<input type="number" id="r_i5" min="0" max="180" value="90" />
+						<button onclick="nudgeRight(5,-5)">S5 -5</button>
+						<button onclick="nudgeRight(5,5)">S5 +5</button>
+					</div>
+					<div>
+						<input type="number" id="r_i6" min="0" max="180" value="30" />
+						<button onclick="nudgeRight(6,-5)">S6 -5</button>
+						<button onclick="nudgeRight(6,5)">S6 +5</button>
+					</div>
+					<div style="margin-top: 8px">
+						<button onclick="applyAnglesRight()">Apply All</button>
+					</div>
+				</div>
+			</div>
 		</div>
 
-		<div class="row">
+		<div class="row" style="margin-top: 16px">
 			<div id="log"></div>
-		</div>
-
-		<h3>Live Joint Angles</h3>
-		<div class="row" id="anglesRow">
-			<span>S1: <strong id="a1">-</strong></span>
-			<span style="margin-left: 10px">S2: <strong id="a2">-</strong></span>
-			<span style="margin-left: 10px">S3: <strong id="a3">-</strong></span>
-			<span style="margin-left: 10px">S4: <strong id="a4">-</strong></span>
-			<span style="margin-left: 10px">S5: <strong id="a5">-</strong></span>
-			<span style="margin-left: 10px">S6: <strong id="a6">-</strong></span>
-		</div>
-
-		<h3>Manual Control</h3>
-		<div class="row" id="manualRow">
-			<div>
-				<input type="number" id="i1" min="0" max="180" value="90" />
-				<button onclick="nudge(1,-5)">S1 -5</button>
-				<button onclick="nudge(1,5)">S1 +5</button>
-			</div>
-			<div>
-				<input type="number" id="i2" min="0" max="180" value="150" />
-				<button onclick="nudge(2,-5)">S2 -5</button>
-				<button onclick="nudge(2,5)">S2 +5</button>
-			</div>
-			<div>
-				<input type="number" id="i3" min="0" max="180" value="20" />
-				<button onclick="nudge(3,-5)">S3 -5</button>
-				<button onclick="nudge(3,5)">S3 +5</button>
-			</div>
-			<div>
-				<input type="number" id="i4" min="0" max="180" value="20" />
-				<button onclick="nudge(4,-5)">S4 -5</button>
-				<button onclick="nudge(4,5)">S4 +5</button>
-			</div>
-			<div>
-				<input type="number" id="i5" min="0" max="180" value="90" />
-				<button onclick="nudge(5,-5)">S5 -5</button>
-				<button onclick="nudge(5,5)">S5 +5</button>
-			</div>
-			<div>
-				<input type="number" id="i6" min="0" max="180" value="30" />
-				<button onclick="nudge(6,-5)">S6 -5</button>
-				<button onclick="nudge(6,5)">S6 +5</button>
-			</div>
-			<div style="margin-top: 8px">
-				<button onclick="applyAngles()">Apply All</button>
-			</div>
 		</div>
 
 		<script>
 			const $ = (id) => document.getElementById(id);
 			const statusEl = $("status");
 			const logEl = $("log");
+			// 듀얼 패널로 표기
 
 			let client = null;
 			let topics = {
 				tx: null,
 				rx: null,
 			};
+			const latestAngles = new Map(); // robot_id -> angles array
 
 			function setStatus(text) {
 				statusEl.textContent = text;
@@ -202,11 +263,21 @@
 						const data = JSON.parse(payload.toString());
 						log(`recv ${topic}: ${JSON.stringify(data)}`);
 						if (topic === topics.rx && data && data.type === "joint_state" && Array.isArray(data.angles)) {
+							const rid = data.robot_id || "unknown";
+							latestAngles.set(rid, data.angles);
 							const a = data.angles;
-							for (let i = 1; i <= 6; i++) {
-								const val = a[i - 1];
-								const el = document.getElementById("a" + i);
-								if (el) el.textContent = val === null || val === undefined ? "-" : String(val);
+							if (rid === "robot_left") {
+								for (let i = 1; i <= 6; i++) {
+									const val = a[i - 1];
+									const el = document.getElementById("l_a" + i);
+									if (el) el.textContent = val === null || val === undefined ? "-" : String(val);
+								}
+							} else if (rid === "robot_right") {
+								for (let i = 1; i <= 6; i++) {
+									const val = a[i - 1];
+									const el = document.getElementById("r_a" + i);
+									if (el) el.textContent = val === null || val === undefined ? "-" : String(val);
+								}
 							}
 						}
 					} catch (e) {
@@ -227,7 +298,9 @@
 				if (!client) return;
 				try {
 					client.end(true);
-				} catch (e) {}
+				} catch (e) {
+					log("disconnect error: " + e.message, false);
+				}
 				client = null;
 				setStatus("disconnected");
 				log("disconnected by user");
@@ -245,6 +318,10 @@
 				}
 			}
 
+			function publishFor(rid, obj) {
+				publish({ ...obj, robot_id: rid });
+			}
+
 			function sendCommand(command) {
 				publish({ type: "command", command, who: "frontend" });
 				log("send command: " + command);
@@ -252,26 +329,57 @@
 
 			$("btnConnect").onclick = connect;
 			$("btnDisconnect").onclick = disconnect;
-			$("btnStartTrack").onclick = () => sendCommand("face_tracking");
-			$("btnStopTrack").onclick = () => sendCommand("stop_face_tracking");
-			$("btnInit").onclick = () => sendCommand("init_pose");
-			$("btnHeart").onclick = () => sendCommand("make_heart");
-			$("btnHug").onclick = () => sendCommand("hug");
+			// Left
+			$("l_btnStartTrack").onclick = () => sendCommandLeft("face_tracking");
+			$("l_btnStopTrack").onclick = () => sendCommandLeft("stop_face_tracking");
+			$("l_btnInit").onclick = () => sendCommandLeft("init_pose");
+			$("l_btnHeart").onclick = () => sendCommandLeft("make_heart");
+			$("l_btnHug").onclick = () => sendCommandLeft("hug");
+			// Right
+			$("r_btnStartTrack").onclick = () => sendCommandRight("face_tracking");
+			$("r_btnStopTrack").onclick = () => sendCommandRight("stop_face_tracking");
+			$("r_btnInit").onclick = () => sendCommandRight("init_pose");
+			$("r_btnHeart").onclick = () => sendCommandRight("make_heart");
+			$("r_btnHug").onclick = () => sendCommandRight("hug");
 
 			// 수동 제어 헬퍼
-			window.nudge = function (id, delta) {
-				publish({ type: "command", command: "nudge_joint", id, delta, who: "frontend" });
+			globalThis.nudgeLeft = function (id, delta) {
+				publishFor("robot_left", { type: "command", command: "nudge_joint", id, delta, who: "frontend" });
+			};
+			globalThis.nudgeRight = function (id, delta) {
+				publishFor("robot_right", { type: "command", command: "nudge_joint", id, delta, who: "frontend" });
 			};
 
-			window.applyAngles = function () {
+			globalThis.applyAnglesLeft = function () {
 				const vals = [];
 				for (let i = 1; i <= 6; i++) {
-					const raw = document.getElementById("i" + i).value;
+					const raw = document.getElementById("l_i" + i).value;
 					const v = Number.parseInt(raw, 10);
 					vals.push(Number.isNaN(v) ? 0 : Math.max(0, Math.min(180, v)));
 				}
-				publish({ type: "command", command: "set_joints", angles: vals, time_ms: 600, who: "frontend" });
+				publishFor("robot_left", { type: "command", command: "set_joints", angles: vals, time_ms: 600, who: "frontend" });
 			};
+			globalThis.applyAnglesRight = function () {
+				const vals = [];
+				for (let i = 1; i <= 6; i++) {
+					const raw = document.getElementById("r_i" + i).value;
+					const v = Number.parseInt(raw, 10);
+					vals.push(Number.isNaN(v) ? 0 : Math.max(0, Math.min(180, v)));
+				}
+				publishFor("robot_right", { type: "command", command: "set_joints", angles: vals, time_ms: 600, who: "frontend" });
+			};
+
+			function sendCommandLeft(command) {
+				publishFor("robot_left", { type: "command", command, who: "frontend" });
+				log("send command (left): " + command);
+			}
+			function sendCommandRight(command) {
+				publishFor("robot_right", { type: "command", command, who: "frontend" });
+				log("send command (right): " + command);
+			}
+
+			// 메시지 처리: 각 로봇 패널 업데이트
+			client && client.on && client.on("message", () => {}); // no-op to keep structure
 		</script>
 	</body>
 </html>
