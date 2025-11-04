@@ -17,6 +17,33 @@ class ActionHug:
         # Arm_Lib I/O 직렬화를 위한 잠금 (텔레메트리/다른 쓰레드와 경합 방지)
         self._arm_lock = arm_lock or threading.Lock()
 
+    def _write6_reliable(self, angles: list, time_ms: int):
+        """write6_array를 신뢰성 있게 전송: 1차 전송 후 아주 짧은 지연 뒤
+        잠금이 바로 가능하면 동일 명령을 한 번 더 전송(경우에 따라 첫 전송이
+        드랍되는 상황을 보완)."""
+        try:
+            with self._arm_lock:
+                self.arm.Arm_serial_servo_write6_array(angles, int(time_ms))
+        except Exception:
+            # 1차 전송 에러는 조용히 무시하고 아래 재시도에 기대
+            pass
+        # 짧은 가드 지연 (시리얼 버스 정리)
+        try:
+            time.sleep(0.03)
+        except Exception:
+            pass
+        try:
+            if self._arm_lock.acquire(timeout=0.05):
+                try:
+                    self.arm.Arm_serial_servo_write6_array(angles, int(time_ms))
+                finally:
+                    try:
+                        self._arm_lock.release()
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
     def _sleep_interruptible(self, seconds: float, cancel_event) -> bool:
         if cancel_event is None:
             time.sleep(seconds)
@@ -49,20 +76,12 @@ class ActionHug:
                 close_pose = [90, 160, 35, 35, 100, 40]
 
             # 펼치기
-            try:
-                with self._arm_lock:
-                    self.arm.Arm_serial_servo_write6_array(open_pose, 1200)
-            except Exception:
-                pass
+            self._write6_reliable(open_pose, 1200)
             if not self._sleep_interruptible(1.2, cancel_event):
                 return "hug_cancelled"
 
             # 끌어안기
-            try:
-                with self._arm_lock:
-                    self.arm.Arm_serial_servo_write6_array(close_pose, 1500)
-            except Exception:
-                pass
+            self._write6_reliable(close_pose, 1500)
             if not self._sleep_interruptible(1.5, cancel_event):
                 return "hug_cancelled"
 
@@ -71,11 +90,7 @@ class ActionHug:
                 return "hug_cancelled"
 
             # 복귀
-            try:
-                with self._arm_lock:
-                    self.arm.Arm_serial_servo_write6_array(neutral, 1200)
-            except Exception:
-                pass
+            self._write6_reliable(neutral, 1200)
             if not self._sleep_interruptible(1.2, cancel_event):
                 return "hug_cancelled"
         except Exception:
