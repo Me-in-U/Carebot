@@ -110,17 +110,34 @@ class CarebotAppMQTT:
         if self.arm is not None:
             self._start_joint_stream(interval_ms=update_interval_ms)
 
-        # MQTT 클라이언트
-        self.client = mqtt.Client(
-            client_id=os.getenv("CAREBOT_MQTT_CLIENT_ID", "carebot-app"),
-            clean_session=True,
-        )
+        # MQTT 클라이언트 (paho-mqtt 2.x 권장 콜백 API 사용, 하위호환 처리)
+        try:
+            self.client = mqtt.Client(
+                client_id=os.getenv("CAREBOT_MQTT_CLIENT_ID", "carebot-app"),
+                clean_session=True,
+                protocol=getattr(mqtt, "MQTTv311", 4),
+                transport="tcp",
+                callback_api_version=getattr(getattr(mqtt, "CallbackAPIVersion", None), "VERSION2", None),  # type: ignore[arg-type]
+            )
+        except TypeError:
+            # 구버전 호환
+            self.client = mqtt.Client(
+                client_id=os.getenv("CAREBOT_MQTT_CLIENT_ID", "carebot-app"),
+                clean_session=True,
+            )
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
         self.client.on_disconnect = self._on_disconnect
 
     # -------------- MQTT 콜백 --------------
-    def _on_connect(self, client: mqtt.Client, userdata: Any, flags: dict, rc: int):
+    def _on_connect(
+        self,
+        client: mqtt.Client,
+        userdata: Any,
+        flags: dict,
+        rc: int,
+        properties: Any | None = None,
+    ):
         self.log.info("mqtt connected rc=%s", rc)
         client.subscribe(self.topic_carebot_rx, qos=self.mqtt_qos)
         # hello + capabilities 전송
@@ -138,7 +155,9 @@ class CarebotAppMQTT:
             }
         )
 
-    def _on_disconnect(self, client: mqtt.Client, userdata: Any, rc: int):
+    def _on_disconnect(
+        self, client: mqtt.Client, userdata: Any, rc: int, properties: Any | None = None
+    ):
         self.log.info("mqtt disconnected rc=%s", rc)
 
     def _on_message(self, client: mqtt.Client, userdata: Any, msg: mqtt.MQTTMessage):
@@ -624,7 +643,14 @@ class CarebotAppMQTT:
             self.mqtt_port,
             self.mqtt_base,
         )
-        self.client.connect(self.mqtt_host, self.mqtt_port, keepalive=30)
+        # 브로커가 아직 준비되지 않은 경우를 대비해 재시도 루프
+        while True:
+            try:
+                self.client.connect(self.mqtt_host, self.mqtt_port, keepalive=30)
+                break
+            except Exception as e:
+                self.log.warning("mqtt connect failed: %s | retry in 2s", e)
+                time.sleep(2.0)
         try:
             self.client.loop_forever()
         except KeyboardInterrupt:

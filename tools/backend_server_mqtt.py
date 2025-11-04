@@ -26,7 +26,7 @@ except Exception as e:
 class MQTTHub:
 
     def __init__(self) -> None:
-        self.host = os.getenv("CAREBOT_MQTT_HOST", "127.0.0.1")
+        self.host = os.getenv("CAREBOT_MQTT_HOST", "192.168.91.1")
         self.port = int(os.getenv("CAREBOT_MQTT_PORT", "1883"))
         self.base = os.getenv("CAREBOT_MQTT_BASE", "carebot")
         self.qos = int(os.getenv("CAREBOT_MQTT_QOS", "0"))
