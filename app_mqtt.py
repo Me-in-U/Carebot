@@ -39,6 +39,8 @@ class CarebotAppMQTT:
 
         with open(config_path, "r", encoding="utf-8") as f:
             cfg = json.load(f)
+        # 전체 구성 보관 (하위 모듈로 전달)
+        self._config = dict(cfg)
 
         # MQTT 구성
         self.mqtt_host = os.getenv(
@@ -103,6 +105,7 @@ class CarebotAppMQTT:
                     arm_device=self.arm,
                     arm_lock=self._arm_io_lock,
                     robot_id=self.robot_id,
+                    config=self._config,
                 )
                 if self.arm is not None
                 else None

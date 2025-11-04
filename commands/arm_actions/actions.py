@@ -14,6 +14,7 @@ class ArmActions:
         arm_device,
         arm_lock: Optional[threading.Lock] = None,
         robot_id: Optional[str] = None,
+        config: Optional[dict] = None,
     ):
         """Wrap high-level arm actions around an already-initialized arm device.
 
@@ -26,6 +27,8 @@ class ArmActions:
         self._arm_lock = arm_lock or threading.Lock()
         # 이 인스턴스가 제어하는 로봇 ID (robot_left / robot_right)
         self.robot_id = robot_id or os.getenv("CAREBOT_ROBOT_ID")
+        # 전체 구성 전달(타이밍, 포트 등)
+        self.config = config or {}
 
     def set_ready_pose(self, time_ms: int = 1500):
         """Move arm to a neutral/ready pose."""
@@ -55,7 +58,10 @@ class ArmActions:
         Returns a short status string.
         """
         return ActionHeart(
-            self.arm, robot_id=self.robot_id, arm_lock=self._arm_lock
+            self.arm,
+            robot_id=self.robot_id,
+            arm_lock=self._arm_lock,
+            config=self.config,
         ).run(cancel_event=cancel_event)
 
     def hug(self, cancel_event=None) -> str:

@@ -1,7 +1,6 @@
 import time
-import os
 import threading
-from typing import Optional
+from typing import Optional, Dict, Any
 
 
 class ActionHeart:
@@ -10,6 +9,7 @@ class ActionHeart:
         arm_device,
         robot_id: Optional[str] = None,
         arm_lock: Optional[threading.Lock] = None,
+        config: Optional[Dict[str, Any]] = None,
     ):
         if arm_device is None:
             raise RuntimeError("arm_device is required")
@@ -18,6 +18,8 @@ class ActionHeart:
         self.robot_id = robot_id
         # Arm_Lib I/O 직렬화를 위한 잠금 (텔레메트리/다른 쓰레드와 경합 방지)
         self._arm_lock = arm_lock or threading.Lock()
+        # 구성(타이밍 등) 전달: 환경변수 대신 config.json을 사용
+        self._config = config or {}
 
     def _write6_reliable(self, angles: list, time_ms: int):
         """write6_array 신뢰성 향상: 1차 전송 후 짧은 지연, 빠르게 잠금 가능하면
@@ -75,7 +77,7 @@ class ActionHeart:
             ]
 
             def mirror_for_right(p: list) -> list:
-                # 기존 구현 관찰에 따르면 S1(베이스), S5(손목 yaw)만 좌우 미러링(180 - v)
+                # 좌우 미러: S1(베이스)와 S5(손목 yaw)만 180 - v
                 q = list(p)
                 try:
                     q[0] = max(0, min(180, 180 - int(q[0])))
@@ -84,38 +86,20 @@ class ActionHeart:
                     pass
                 return q
 
-            if self.robot_id == "robot_right":
-                poses = [mirror_for_right(p) for p in left_poses]
-            else:
-                # robot_left 또는 기본
-                poses = left_poses
+            poses = (
+                [mirror_for_right(p) for p in left_poses]
+                if self.robot_id == "robot_right"
+                else left_poses
+            )
 
             neutral = [90, 150, 20, 20, 90, 30]
-            # 타이밍 파라미터(환경변수로 조절 가능)
-            #  - CAREBOT_HEART_MOVE_MS: 각 단계 이동 시간(ms) [기본 1200]
-            #  - CAREBOT_HEART_HOLD_BETWEEN_S: 단계 사이 짧은 유지(sec) [기본 0.3]
-            #  - CAREBOT_HEART_HOLD_FINAL_S: 마지막 단계 후 유지(sec) [기본 0.4]
-            #  - CAREBOT_HEART_HOLD_NEUTRAL_S: 뉴트럴 복귀 후 유지(sec) [기본: move_ms/1000]
-            try:
-                move_ms = int(os.getenv("CAREBOT_HEART_MOVE_MS", "1200"))
-            except Exception:
-                move_ms = 1200
-            try:
-                hold_between_s = float(os.getenv("CAREBOT_HEART_HOLD_BETWEEN_S", "0.3"))
-            except Exception:
-                hold_between_s = 0.3
-            try:
-                hold_final_s = float(os.getenv("CAREBOT_HEART_HOLD_FINAL_S", "0.4"))
-            except Exception:
-                hold_final_s = 0.4
-            try:
-                hold_neutral_s = float(
-                    os.getenv(
-                        "CAREBOT_HEART_HOLD_NEUTRAL_S", str(max(0.0, move_ms / 1000.0))
-                    )
-                )
-            except Exception:
-                hold_neutral_s = max(0.0, move_ms / 1000.0)
+            # 타이밍 파라미터(환경변수 제거, config 기반)
+            move_ms = int(self._config.get("heart_move_ms", 1200))
+            hold_between_s = float(self._config.get("heart_hold_between_s", 0.3))
+            hold_final_s = float(self._config.get("heart_hold_final_s", 0.4))
+            hold_neutral_s = float(
+                self._config.get("heart_hold_neutral_s", max(0.0, move_ms / 1000.0))
+            )
 
             # 단계별 수행
             for i, pose in enumerate(poses):
