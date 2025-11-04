@@ -239,6 +239,7 @@ class CarebotAppMQTT:
         self._send(
             {"type": "ack", "ts": now_iso(), "command": cmd, "status": "accepted"}
         )
+        # 처리 시작: 빨간색
         self._led_set(50, 0, 0)
 
         # 선점(기존 동작 중단)
@@ -319,7 +320,8 @@ class CarebotAppMQTT:
                     "error": "arm_or_tracker_unavailable",
                 }
             )
-            self._led_set(0, 0, 50)
+            # 처리 종료: 초록색
+            self._led_set(0, 50, 0)
             return
         self.log.info("starting face_tracking")
         started = self.face_tracking.start()
@@ -335,8 +337,8 @@ class CarebotAppMQTT:
                 ),
             }
         )
-        if started or self.face_tracking.is_running():
-            self._led_set(0, 50, 0)
+        # 처리 종료: 초록색
+        self._led_set(0, 50, 0)
 
     def _cmd_stop_face_tracking(self, cmd: str):
         if self.face_tracking is None:
@@ -350,7 +352,8 @@ class CarebotAppMQTT:
                     "error": "tracker_unavailable",
                 }
             )
-            self._led_set(0, 0, 50)
+            # 처리 종료: 초록색
+            self._led_set(0, 50, 0)
             return
         self.log.info("stopping face_tracking")
         stopped = self.face_tracking.stop()
@@ -362,7 +365,8 @@ class CarebotAppMQTT:
                 "status": ("stopped" if stopped else "not_running"),
             }
         )
-        self._led_set(0, 0, 50)
+        # 처리 종료: 초록색
+        self._led_set(0, 50, 0)
 
     def _cmd_make_heart(self, cmd: str):
         if self.actions is None:
@@ -375,6 +379,7 @@ class CarebotAppMQTT:
                     "error": "arm_unavailable",
                 }
             )
+            self._led_set(0, 50, 0)
             return
         self._start_action(
             cmd, lambda cancel: self.actions.make_heart(cancel_event=cancel)
@@ -391,6 +396,7 @@ class CarebotAppMQTT:
                     "error": "arm_unavailable",
                 }
             )
+            self._led_set(0, 50, 0)
             return
         self._start_action(cmd, lambda cancel: self.actions.hug(cancel_event=cancel))
 
@@ -405,6 +411,7 @@ class CarebotAppMQTT:
                     "error": "arm_unavailable",
                 }
             )
+            self._led_set(0, 50, 0)
             return
         self._start_action(
             cmd, lambda cancel: self.actions.init_pose(cancel_event=cancel)
@@ -421,6 +428,7 @@ class CarebotAppMQTT:
                     "error": "arm_unavailable",
                 }
             )
+            self._led_set(0, 50, 0)
             return
         sid = data.get("id") or data.get("sid")
         angle = data.get("angle")
@@ -439,6 +447,7 @@ class CarebotAppMQTT:
                     "error": "invalid_sid",
                 }
             )
+            self._led_set(0, 50, 0)
             return
         if angle is None:
             self._send(
@@ -450,6 +459,7 @@ class CarebotAppMQTT:
                     "error": "missing_angle",
                 }
             )
+            self._led_set(0, 50, 0)
             return
         try:
             self._last_manual_ts = time.time()
@@ -465,6 +475,7 @@ class CarebotAppMQTT:
                 "outcome": outcome,
             }
         )
+        self._led_set(0, 50, 0)
 
     def _cmd_set_joints(self, cmd: str, data: Dict[str, Any]):
         if self.actions is None:
@@ -477,6 +488,7 @@ class CarebotAppMQTT:
                     "error": "arm_unavailable",
                 }
             )
+            self._led_set(0, 50, 0)
             return
         angles = data.get("angles")
         t = data.get("time_ms", 500)
@@ -494,6 +506,7 @@ class CarebotAppMQTT:
                 "outcome": outcome,
             }
         )
+        self._led_set(0, 50, 0)
 
     def _cmd_nudge_joint(self, cmd: str, data: Dict[str, Any]):
         if self.actions is None:
@@ -506,6 +519,7 @@ class CarebotAppMQTT:
                     "error": "arm_unavailable",
                 }
             )
+            self._led_set(0, 50, 0)
             return
         sid = data.get("id") or data.get("sid")
         delta = data.get("delta", 0)
@@ -524,6 +538,7 @@ class CarebotAppMQTT:
                     "error": "invalid_sid",
                 }
             )
+            self._led_set(0, 50, 0)
             return
         try:
             int(delta)
@@ -537,6 +552,7 @@ class CarebotAppMQTT:
                     "error": "invalid_delta",
                 }
             )
+            self._led_set(0, 50, 0)
             return
         try:
             self._last_manual_ts = time.time()
@@ -552,6 +568,7 @@ class CarebotAppMQTT:
                 "outcome": outcome,
             }
         )
+        self._led_set(0, 50, 0)
 
     def _start_action(self, cmd_name: str, action_callable):
         with self._cmd_lock:
@@ -562,7 +579,8 @@ class CarebotAppMQTT:
             def _runner():
                 try:
                     self.log.info("action start | %s", cmd_name)
-                    self._led_set(0, 50, 0)
+                    # 처리 중: 빨간색
+                    self._led_set(50, 0, 0)
                     outcome = action_callable(cancel_event)
                     status = "completed" if not cancel_event.is_set() else "cancelled"
                     self._send(
@@ -589,7 +607,8 @@ class CarebotAppMQTT:
                         }
                     )
                 finally:
-                    self._led_set(0, 0, 50)
+                    # 처리 종료: 초록색
+                    self._led_set(0, 50, 0)
                     with self._cmd_lock:
                         self._action_thread = None
                         self._action_cancel = None

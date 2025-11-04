@@ -65,41 +65,45 @@ class ActionHeart:
         cancel_event 가 설정되면 즉시 중단하고 'heart_cancelled' 반환.
         """
         try:
-            # 안전한 기본 시간/대기
-            time_ms = 1400
+            # 사용자 제공 왼팔 하트 동작 3단계 각도(순서대로 수행)
+            # S1..S6: [0,115,40,20,90,0] -> [0,50,55,20,90,0] -> [0,50,25,0,90,0]
+            left_poses = [
+                [0, 115, 40, 20, 90, 0],
+                [0, 50, 55, 20, 90, 0],
+                [0, 50, 25, 0, 90, 0],
+            ]
 
-            # 좌/우 로봇별로 미세하게 다른 포즈를 사용 (하드웨어에 맞춰 조정 가능)
-            if self.robot_id == "robot_left":
-                # 왼쪽 로봇: 손목(5번) 각도를 왼쪽 방향으로, 약간 낮게
-                pose1 = [85, 135, 30, 30, 60, 35]
-                pose2 = [85, 150, 38, 38, 70, 40]
-            elif self.robot_id == "robot_right":
-                # 오른쪽 로봇: 손목(5번) 각도를 오른쪽 방향으로, 약간 낮게
-                pose1 = [95, 135, 30, 30, 120, 35]
-                pose2 = [95, 150, 38, 38, 110, 40]
+            def mirror_for_right(p: list) -> list:
+                # 기존 구현 관찰에 따르면 S1(베이스), S5(손목 yaw)만 좌우 미러링(180 - v)
+                q = list(p)
+                try:
+                    q[0] = max(0, min(180, 180 - int(q[0])))
+                    q[4] = max(0, min(180, 180 - int(q[4])))
+                except Exception:
+                    pass
+                return q
+
+            if self.robot_id == "robot_right":
+                poses = [mirror_for_right(p) for p in left_poses]
             else:
-                # 기본(공통) 포즈
-                pose1 = [90, 140, 32, 32, 90, 35]
-                pose2 = [90, 150, 38, 38, 90, 40]
+                # robot_left 또는 기본
+                poses = left_poses
 
             neutral = [90, 150, 20, 20, 90, 30]
+            time_ms = 1200
 
-            # 단계 1: 포즈1
-            self._write6_reliable(pose1, time_ms)
-            if not self._sleep_interruptible(time_ms / 1000.0, cancel_event):
-                return "heart_cancelled"
+            # 단계별 수행
+            for i, pose in enumerate(poses):
+                self._write6_reliable(pose, time_ms)
+                if not self._sleep_interruptible(time_ms / 1000.0, cancel_event):
+                    return "heart_cancelled"
+                # 단계 사이 짧은 유지
+                if i < len(poses) - 1:
+                    if not self._sleep_interruptible(0.3, cancel_event):
+                        return "heart_cancelled"
 
-            # 짧은 유지
+            # 마지막 잠깐 유지
             if not self._sleep_interruptible(0.4, cancel_event):
-                return "heart_cancelled"
-
-            # 단계 2: 포즈2 (하트 마무리)
-            self._write6_reliable(pose2, time_ms)
-            if not self._sleep_interruptible(time_ms / 1000.0, cancel_event):
-                return "heart_cancelled"
-
-            # 잠깐 유지
-            if not self._sleep_interruptible(0.6, cancel_event):
                 return "heart_cancelled"
 
             # 복귀: 뉴트럴 포즈
