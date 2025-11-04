@@ -144,9 +144,12 @@ class CarebotAppMQTT:
             self._start_joint_stream(interval_ms=update_interval_ms)
 
         # MQTT 클라이언트 (paho-mqtt 2.x 권장 콜백 API 사용, 하위호환 처리)
+        # 인스턴스마다 고유 client_id 사용 (동일 ID 중복 접속 시 기존 연결이 끊김)
+        default_client_id = f"carebot-app-{self.robot_id}-{os.getpid()}"
+        client_id = os.getenv("CAREBOT_MQTT_CLIENT_ID", default_client_id)
         try:
             self.client = mqtt.Client(
-                client_id=os.getenv("CAREBOT_MQTT_CLIENT_ID", "carebot-app"),
+                client_id=client_id,
                 clean_session=True,
                 protocol=getattr(mqtt, "MQTTv311", 4),
                 transport="tcp",
@@ -155,7 +158,7 @@ class CarebotAppMQTT:
         except TypeError:
             # 구버전 호환
             self.client = mqtt.Client(
-                client_id=os.getenv("CAREBOT_MQTT_CLIENT_ID", "carebot-app"),
+                client_id=client_id,
                 clean_session=True,
             )
         self.client.on_connect = self._on_connect
@@ -193,10 +196,17 @@ class CarebotAppMQTT:
         self,
         client: mqtt.Client,
         userdata: Any,
-        rc: int,
+        rc: Any = None,
         properties: Optional[Any] = None,
+        *args: Any,
+        **kwargs: Any,
     ):
-        self.log.info("mqtt disconnected rc=%s", rc)
+        # paho-mqtt v1/v2 모두 호환: 추가 인수 무시, rc가 ReasonCode일 수도 있음
+        try:
+            rc_repr = getattr(rc, "value", rc)
+        except Exception:
+            rc_repr = rc
+        self.log.info("mqtt disconnected rc=%s", rc_repr)
 
     def _on_message(self, client: mqtt.Client, userdata: Any, msg: mqtt.MQTTMessage):
         try:
