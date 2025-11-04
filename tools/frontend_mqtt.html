@@ -86,16 +86,22 @@
 			<span class="pill" id="role">frontend</span>
 		</div>
 
-		<div class="row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start">
+		<!-- 공통 Command 패널: 버튼만 있고, 모든 로봇에게 브로드캐스트로 전송 -->
+		<div class="row" style="border: 1px solid #ddd; padding: 12px; border-radius: 8px; margin-top: 12px">
+			<div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap">
+				<strong>Commands (broadcast to both)</strong>
+				<button id="cmdStartTrack">Start Tracking</button>
+				<button id="cmdStopTrack">Stop Tracking</button>
+				<button id="cmdInit">Init Pose</button>
+				<button id="cmdHeart">Make Heart</button>
+				<button id="cmdHug">Hug</button>
+			</div>
+		</div>
+
+		<!-- 좌/우 패널: 실시간 각도 + 개별 수동 제어만 제공 -->
+		<div class="row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; margin-top: 12px">
 			<div id="panelLeft" style="border: 1px solid #ddd; padding: 12px; border-radius: 8px">
 				<h3>Left Robot <span class="pill">robot_left</span></h3>
-				<div class="row">
-					<button id="l_btnStartTrack">Start Tracking</button>
-					<button id="l_btnStopTrack">Stop Tracking</button>
-					<button id="l_btnInit">Init Pose</button>
-					<button id="l_btnHeart">Make Heart</button>
-					<button id="l_btnHug">Hug</button>
-				</div>
 				<h4>Live Joint Angles</h4>
 				<div class="row">
 					<span>S1: <strong id="l_a1">-</strong></span>
@@ -145,13 +151,6 @@
 
 			<div id="panelRight" style="border: 1px solid #ddd; padding: 12px; border-radius: 8px">
 				<h3>Right Robot <span class="pill">robot_right</span></h3>
-				<div class="row">
-					<button id="r_btnStartTrack">Start Tracking</button>
-					<button id="r_btnStopTrack">Stop Tracking</button>
-					<button id="r_btnInit">Init Pose</button>
-					<button id="r_btnHeart">Make Heart</button>
-					<button id="r_btnHug">Hug</button>
-				</div>
 				<h4>Live Joint Angles</h4>
 				<div class="row">
 					<span>S1: <strong id="r_a1">-</strong></span>
@@ -329,18 +328,12 @@
 
 			$("btnConnect").onclick = connect;
 			$("btnDisconnect").onclick = disconnect;
-			// Left
-			$("l_btnStartTrack").onclick = () => sendCommandLeft("face_tracking");
-			$("l_btnStopTrack").onclick = () => sendCommandLeft("stop_face_tracking");
-			$("l_btnInit").onclick = () => sendCommandLeft("init_pose");
-			$("l_btnHeart").onclick = () => sendCommandLeft("make_heart");
-			$("l_btnHug").onclick = () => sendCommandLeft("hug");
-			// Right
-			$("r_btnStartTrack").onclick = () => sendCommandRight("face_tracking");
-			$("r_btnStopTrack").onclick = () => sendCommandRight("stop_face_tracking");
-			$("r_btnInit").onclick = () => sendCommandRight("init_pose");
-			$("r_btnHeart").onclick = () => sendCommandRight("make_heart");
-			$("r_btnHug").onclick = () => sendCommandRight("hug");
+			// 공통 Command 버튼: 항상 두 로봇 모두에게 브로드캐스트(robot_id: "all")
+			$("cmdStartTrack").onclick = () => publishFor("all", { type: "command", command: "face_tracking", who: "frontend" });
+			$("cmdStopTrack").onclick = () => publishFor("all", { type: "command", command: "stop_face_tracking", who: "frontend" });
+			$("cmdInit").onclick = () => publishFor("all", { type: "command", command: "init_pose", who: "frontend" });
+			$("cmdHeart").onclick = () => publishFor("all", { type: "command", command: "make_heart", who: "frontend" });
+			$("cmdHug").onclick = () => publishFor("all", { type: "command", command: "hug", who: "frontend" });
 
 			// 수동 제어 헬퍼
 			globalThis.nudgeLeft = function (id, delta) {

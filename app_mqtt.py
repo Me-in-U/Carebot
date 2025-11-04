@@ -41,7 +41,7 @@ class CarebotAppMQTT:
 
         # MQTT 구성
         self.mqtt_host = os.getenv(
-            "CAREBOT_MQTT_HOST", cfg.get("mqtt_host", "127.0.0.1")
+            "CAREBOT_MQTT_HOST", cfg.get("mqtt_host", "192.168.91.1")
         )
         self.mqtt_port = int(os.getenv("CAREBOT_MQTT_PORT", cfg.get("mqtt_port", 1883)))
         self.mqtt_base = os.getenv("CAREBOT_MQTT_BASE", cfg.get("mqtt_base", "carebot"))
@@ -587,8 +587,9 @@ class CarebotAppMQTT:
     def _send(self, obj: Dict[str, Any]):
         try:
             payload = dict(obj)
-            payload.setdefault("who", "carebot")
-            payload.setdefault("robot_id", self.robot_id)
+            # 전송 메타: 항상 robot_id를 강제 주입하여 프런트/백엔드가 로봇을 식별 가능하게 함
+            payload["who"] = payload.get("who") or "carebot"
+            payload["robot_id"] = self.robot_id
             self.client.publish(
                 self.topic_carebot_tx, json.dumps(payload), qos=self.mqtt_qos
             )
