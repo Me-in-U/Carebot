@@ -79,6 +79,12 @@ class CarebotAppMQTT:
         camera_index = int(cfg.get("camera_index", 0))
         update_interval_ms = int(cfg.get("update_interval_ms", 200))
 
+        # LED 동작 정책 (최소 간격, 비차단 모드)
+        self._led_enabled = bool(cfg.get("led_enabled", True))
+        self._led_min_interval_s = float(cfg.get("led_min_interval_s", 0.15))
+        self._led_last_ts = 0.0
+        self._led_last_rgb = (None, None, None)
+
         # 로봇팔 및 컨트롤러 초기화
         self.arm = None
         self._arm_io_lock = threading.Lock()
@@ -630,11 +636,40 @@ class CarebotAppMQTT:
             t.start()
 
     def _led_set(self, r: int, g: int, b: int):
+        """LED 설정을 '최선 수행'으로 처리한다.
+        - 동일 색상 반복은 억제
+        - 설정 최소 간격(self._led_min_interval_s) 미만이면 건너뜀
+        - Arm I/O 락을 비차단으로 시도하고 실패 시 건너뜀 (동작 우선)
+        """
         try:
-            if self.arm is not None and hasattr(self.arm, "Arm_RGB_set"):
-                with self._arm_io_lock:
-                    self.arm.Arm_RGB_set(int(r), int(g), int(b))
+            if not self._led_enabled:
+                return
+            if self.arm is None or not hasattr(self.arm, "Arm_RGB_set"):
+                return
+
+            r_i, g_i, b_i = int(r), int(g), int(b)
+            now_t = time.time()
+
+            # 동일 색상 중복 억제 (최소 간격 내 동일 색상 요청은 스킵)
+            if self._led_last_rgb == (r_i, g_i, b_i):
+                if (now_t - self._led_last_ts) < self._led_min_interval_s:
+                    return
+
+            acquired = self._arm_io_lock.acquire(blocking=False)
+            if not acquired:
+                # 동작(모션)과 경합 시 LED는 포기
+                return
+            try:
+                self.arm.Arm_RGB_set(r_i, g_i, b_i)
+                self._led_last_ts = now_t
+                self._led_last_rgb = (r_i, g_i, b_i)
+            finally:
+                try:
+                    self._arm_io_lock.release()
+                except Exception:
+                    pass
         except Exception:
+            # LED 실패는 무시 (최선 수행)
             pass
 
     def _on_face_tracking_event(self, event: dict):
