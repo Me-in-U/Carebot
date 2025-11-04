@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import sys
 import threading
 import time
 from datetime import datetime, timezone
@@ -744,5 +745,55 @@ class CarebotAppMQTT:
 
 if __name__ == "__main__":
     base = os.path.dirname(os.path.abspath(__file__))
+
+    # 간단한 CLI 오버라이드 파서: key=value 형식으로 환경변수를 설정해 편의 제공
+    # 예) python app_mqtt.py which_arm=left mqtt_host=127.0.0.1 mqtt_port=1883
+    args = sys.argv[1:]
+    for arg in args:
+        if arg in ("-h", "--help", "help"):
+            print(
+                "\nCarebot app (MQTT) CLI overrides:\n"
+                "  which_arm=left|right   -> CAREBOT_ROBOT_ID=robot_left|robot_right\n"
+                "  robot_id=...           -> CAREBOT_ROBOT_ID=... (left/right도 허용)\n"
+                "  arm_port=COM3          -> CAREBOT_ARM_PORT=COM3 (Windows)\n"
+                "  mqtt_host=127.0.0.1    -> CAREBOT_MQTT_HOST\n"
+                "  mqtt_port=1883         -> CAREBOT_MQTT_PORT\n"
+                "  mqtt_base=carebot      -> CAREBOT_MQTT_BASE\n"
+                "  mqtt_qos=0             -> CAREBOT_MQTT_QOS\n"
+                "\n예시:\n  python Carebot\\app_mqtt.py which_arm=left mqtt_host=127.0.0.1 mqtt_port=1883\n"
+            )
+            sys.exit(0)
+        if "=" not in arg:
+            continue
+        k, v = arg.split("=", 1)
+        k = (k or "").strip().lower()
+        v = (v or "").strip()
+        if not k:
+            continue
+        if k in {"which_arm", "arm"}:
+            vv = v.lower()
+            if vv in {"left", "robot_left"}:
+                os.environ["CAREBOT_ROBOT_ID"] = "robot_left"
+            elif vv in {"right", "robot_right"}:
+                os.environ["CAREBOT_ROBOT_ID"] = "robot_right"
+        elif k == "robot_id":
+            vv = v.lower()
+            if vv in {"left", "robot_left"}:
+                os.environ["CAREBOT_ROBOT_ID"] = "robot_left"
+            elif vv in {"right", "robot_right"}:
+                os.environ["CAREBOT_ROBOT_ID"] = "robot_right"
+            else:
+                os.environ["CAREBOT_ROBOT_ID"] = v
+        elif k == "arm_port":
+            os.environ["CAREBOT_ARM_PORT"] = v
+        elif k == "mqtt_host":
+            os.environ["CAREBOT_MQTT_HOST"] = v
+        elif k == "mqtt_port":
+            os.environ["CAREBOT_MQTT_PORT"] = v
+        elif k == "mqtt_base":
+            os.environ["CAREBOT_MQTT_BASE"] = v
+        elif k == "mqtt_qos":
+            os.environ["CAREBOT_MQTT_QOS"] = v
+
     app = CarebotAppMQTT(config_path=os.path.join(base, "config.json"))
     app.run()
