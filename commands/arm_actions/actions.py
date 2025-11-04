@@ -66,9 +66,12 @@ class ArmActions:
 
     def hug(self, cancel_event=None) -> str:
         """Perform a gentle 'hug' gesture with the arm and return status."""
-        return ActionHug(self.arm, robot_id=self.robot_id, arm_lock=self._arm_lock).run(
-            cancel_event=cancel_event
-        )
+        return ActionHug(
+            self.arm,
+            robot_id=self.robot_id,
+            arm_lock=self._arm_lock,
+            config=self.config,
+        ).run(cancel_event=cancel_event)
 
     def init_pose(self, cancel_event=None) -> str:
         """Move the arm to a conservative initial/ready pose.
